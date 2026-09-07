@@ -18,6 +18,7 @@ from PyQt5.QtCore import QMutex, QTimer, Qt, pyqtSlot, QMutexLocker, QPoint, QMo
 from models import Host, AppConfig, HostStatus, validate_ip_or_hostname
 from services import NotificationService
 from monitor_thread import MonitorThread
+from subscribers.monitor_subscriber import MonitorSubscriber
 from helpdesk_service import HelpdeskService
 
 # Dependency Injection
@@ -375,7 +376,11 @@ class MainWindow(QMainWindow):
 
     def _init_monitor_thread(self) -> None:
         """Инициализация потока мониторинга с Repository"""
-        self._monitor_thread = MonitorThread(self._repository, self._config)
+        self._monitor_thread = MonitorThread(
+            self._repository,
+            self._config,
+            db_name=self._db_manager.db_name,
+        )
         self._monitor_thread.hosts_offline.connect(self._on_hosts_offline)
         self._monitor_thread.hosts_recovered.connect(self._on_hosts_recovered)
         self._monitor_thread.scan_started.connect(self._on_scan_started)
@@ -383,6 +388,10 @@ class MainWindow(QMainWindow):
         self._monitor_thread.host_status_changed.connect(self._repository.update_status)
         self._monitor_thread.error_occurred.connect(lambda e: logging.error(f"MonitorThread Error: {e}"))
         self._monitor_thread.start()
+
+        # Подписчик: синхронизирует Repository-события с MonitorThread
+        # (прерывает цикл при добавлении/удалении/смене IP хоста)
+        self._monitor_subscriber = MonitorSubscriber(self._repository, self._monitor_thread)
 
     # ==================== DATA HANDLING ====================
 

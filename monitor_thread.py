@@ -37,10 +37,11 @@ class MonitorThread(QThread):
     # Новый сигнал для обновления статуса в главном потоке (Thread Safety)
     host_status_changed = pyqtSignal(str, str, object) # id, status, offline_since
 
-    def __init__(self, repository: HostRepository, config: AppConfig):
+    def __init__(self, repository: HostRepository, config: AppConfig, db_name: str = "hosts.db"):
         super().__init__()
         self._repository = repository
         self._config = config
+        self._db_name = db_name
         self._running = True
         self._executor: ThreadPoolExecutor = None
         self._force_scan_flag = False
@@ -118,7 +119,7 @@ class MonitorThread(QThread):
                 db = QSqlDatabase.database(connection_name)
             else:
                 db = QSqlDatabase.addDatabase("QSQLITE", connection_name)
-                db.setDatabaseName("hosts.db")
+                db.setDatabaseName(self._db_name)
             
             if not db.open():
                 self.error_occurred.emit(f"Failed to open DB in thread: {db.lastError().text()}")
