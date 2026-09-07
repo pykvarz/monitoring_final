@@ -18,6 +18,7 @@ from constants import (
     get_svg_total, get_svg_add_host, get_svg_add_group,
     get_svg_import, get_svg_export, get_svg_scan, get_svg_bulk,
     get_svg_theme, get_svg_settings, get_svg_delete, get_svg_history,
+    get_svg_pause, get_svg_play,
     COLOR_TOTAL
 )
 from ui_components import UIComponents
@@ -147,6 +148,7 @@ class ThemeManager:
             ('_btn_delete', get_svg_delete),
             ('_btn_history', get_svg_history),
             ('_btn_scan', get_svg_scan),
+            ('_btn_pause', lambda t: get_svg_play(t) if (getattr(self._window, '_monitor_thread', None) and self._window._monitor_thread.is_paused()) else get_svg_pause(t)),
             ('_btn_settings', get_svg_settings),
             ('_btn_export', get_svg_export),
         ]:

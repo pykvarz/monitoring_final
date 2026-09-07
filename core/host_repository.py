@@ -54,10 +54,8 @@ class HostRepository(QObject):
         return self._data_manager.get_all_hosts(connection_name)
     
     def find_by_group(self, group: str) -> List[Host]:
-        # Optimization: SQL query would be better, but filtering in memory for now is safe for architecture
-        # If needed, add get_hosts_by_group to DataManager
-        all_hosts = self.get_all()
-        return [h for h in all_hosts if h.group == group]
+        # SQL-фильтрация на стороне БД через DataManager
+        return self._data_manager.get_hosts_by_group(group)
 
     def get_stats(self) -> Dict[str, int]:
         return self._data_manager.get_stats()

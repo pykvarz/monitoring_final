@@ -59,6 +59,24 @@ class DataManager(QObject):
         
         return hosts
 
+    def get_hosts_by_group(self, group: str) -> List[Host]:
+        """Получение хостов по группе (SQL-фильтрация на стороне БД)"""
+        hosts = []
+        if not self.db_manager.get_db().isOpen():
+            return hosts
+
+        query = QSqlQuery()
+        query.prepare("SELECT * FROM hosts WHERE grp = :group ORDER BY status, name")
+        query.bindValue(":group", group)
+        if query.exec_():
+            while query.next():
+                hosts.append(self._record_to_host(query))
+            query.finish()
+        else:
+            logging.error(f"Ошибка фильтрации по группе '{group}': {query.lastError().text()}")
+
+        return hosts
+
     def add_host(self, host: Host) -> bool:
         """Добавление нового хоста"""
         query = QSqlQuery()
@@ -166,6 +184,10 @@ class DataManager(QObject):
             old_status = lookup.value("status")
             host_name = lookup.value("name") or host_id
 
+        # Узел в статусе ONLINE никогда не может иметь offline_since — всегда сбрасываем в None
+        if status == "ONLINE":
+            offline_since = None
+
         query = QSqlQuery()
         
         # Обновляем status, last_seen и offline_since всегда.
@@ -183,7 +205,7 @@ class DataManager(QObject):
         query.prepare(sql)
         query.bindValue(":status", status)
         query.bindValue(":last_seen", datetime.now().isoformat())
-        query.bindValue(":offline_since", offline_since)
+        query.bindValue(":offline_since", offline_since if offline_since else None)
         query.bindValue(":id", host_id)
         
         if query.exec_():
@@ -408,14 +430,19 @@ class DataManager(QObject):
 
     def _record_to_host(self, query: QSqlQuery) -> Host:
         """Helper: QSqlQuery record -> Host object"""
+        st = query.value("status")
+        raw_os = query.value("offline_since")
+        # Если статус ONLINE или колонка пустая — offline_since строго None
+        offline_since = (raw_os if raw_os else None) if st != "ONLINE" else None
+
         return Host(
             id=query.value("id"),
             ip=query.value("ip"),
             name=query.value("name"),
             address=query.value("address") or "",
             group=query.value("grp"),
-            status=query.value("status"),
-            offline_since=query.value("offline_since"),
+            status=st,
+            offline_since=offline_since,
             notifications_enabled=bool(query.value("notifications_enabled"))
         )
 

@@ -99,6 +99,9 @@ class HostTableModel(QAbstractTableModel):
         status_changed = False
 
         for host in updated_hosts:
+            if host.status == "ONLINE":
+                host.offline_since = None
+
             if host.id in self._host_map:
                 idx = self._host_map[host.id]
                 old_status = self._hosts[idx].status
@@ -315,7 +318,7 @@ class HostTableModel(QAbstractTableModel):
         for row, host in enumerate(self._hosts):
             if host.id == host_id:
                 host.status = status
-                host.offline_since = offline_since
+                host.offline_since = offline_since if status != "ONLINE" else None
                 
                 start_index = self.index(row, 0)
                 end_index = self.index(row, self.columnCount() - 1)
