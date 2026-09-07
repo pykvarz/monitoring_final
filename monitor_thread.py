@@ -262,15 +262,17 @@ class MonitorThread(QThread):
         should_update = False
         
         if ping_status == "ONLINE":
-            if host.status != "ONLINE":
-                new_status = "ONLINE"
+            new_status = "ONLINE"
+            if host.status != "ONLINE" or host.offline_since:
                 offline_since = None
                 should_update = True
+            else:
+                offline_since = None
             
             # Optimization: Heartbeat Throttling (Reduce DB I/O)
             # Only update last_seen if it's been more than 60 seconds (or never set)
             # This prevents writing to DB on every single ping (e.g. every 2s)
-            elif not should_update:
+            if not should_update:
                 if not host.last_seen:
                     should_update = True
                 else:
@@ -290,31 +292,28 @@ class MonitorThread(QThread):
             if host.status == "MAINTENANCE":
                 return host.status, host.offline_since, False
 
-            # Если узел уже OFFLINE — он остаётся OFFLINE, никакого отката в WAITING
-            if host.status == "OFFLINE":
-                if not host.offline_since:
-                    offline_since = current_time.isoformat()
-                    should_update = True
-                return "OFFLINE", offline_since, should_update
-
-            # Проверяем, не является ли offline_since устаревшим от прошлого падения.
-            # Ситуация: узел упал → восстановился → снова упал. Batch-запись
-            # восстановления (offline_since=NULL) могла не успеть дойти до потока
-            # мониторинга, поэтому host.offline_since может содержать старый timestamp.
-            # Сравниваем offline_since с временем последнего зафиксированного
-            # восстановления: если offline_since < recovery_time — он устаревший.
-            # Важно: после сброса (offline_since=now) он станет свежее recovery_time
-            # и на следующем пинге сбрасываться уже не будет — таймер накапливается.
+            # 1. Проверяем, не является ли offline_since устаревшим от прошлого падения
             recovery_time = self._recovery_times.get(host.id)
             if offline_since and recovery_time:
                 try:
                     os_dt = datetime.fromisoformat(offline_since)
                     if os_dt.tzinfo is None:
                         os_dt = os_dt.replace(tzinfo=timezone.utc)
-                    if os_dt < recovery_time:
-                        offline_since = None  # Устаревший — сбрасываем
+                    if os_dt <= recovery_time:
+                        offline_since = None  # Устаревший от прошлого падения — сбрасываем!
                 except ValueError:
                     offline_since = None
+
+            # 2. Если узел был ONLINE — это НОВОЕ падение, отсчёт простоя начинается сейчас!
+            known_st = self._known_statuses.get(host.id, host.status)
+            if host.status == "ONLINE" or known_st == "ONLINE":
+                if not offline_since:
+                    offline_since = current_time.isoformat()
+                    should_update = True
+
+            # 3. Если узел уже подтверждённо OFFLINE и offline_since актуален — остаётся OFFLINE
+            if host.status == "OFFLINE" and offline_since:
+                return "OFFLINE", offline_since, should_update
 
             if not offline_since:
                 offline_since = current_time.isoformat()
