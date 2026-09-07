@@ -80,14 +80,28 @@ class EventCardWidget(QFrame):
     """Карточка отдельного события в ленте журнала (крупные шрифты и просторные бейджи)"""
     def __init__(self, when_str: str, full_time: str, host_name: str, status_code: str, theme="dark"):
         super().__init__()
+        status_info = {
+            "ONLINE":       ("Online",              "#10b981", "rgba(16, 185, 129, 0.15)", "✓"),
+            "OFFLINE":      ("Offline",             "#ef4444", "rgba(239, 68, 68, 0.15)", "⚠️"),
+            "WAITING":      ("Ожидание",            "#f59e0b", "rgba(245, 158, 11, 0.15)", "⏳"),
+            "MAINTENANCE":  ("Тех.обсл.",           "#8b5cf6", "rgba(139, 92, 246, 0.15)", "🔧"),
+        }
+        st_title, st_color, st_bg, st_icon = status_info.get(status_code, (status_code, "#888888", "rgba(136, 136, 136, 0.15)", "•"))
+
         is_dark = theme == "dark"
         bg = "#1e222b" if is_dark else "#ffffff"
+        bg_hover = "#252b37" if is_dark else "#f8fafc"
         border = "#2a2f3d" if is_dark else "#e2e8f0"
         self.setStyleSheet(f"""
             EventCardWidget {{
                 background-color: {bg};
                 border: 1px solid {border};
+                border-left: 4px solid {st_color};
                 border-radius: 8px;
+            }}
+            EventCardWidget:hover {{
+                background-color: {bg_hover};
+                border-color: {st_color};
             }}
         """)
         layout = QVBoxLayout(self)
@@ -103,24 +117,16 @@ class EventCardWidget(QFrame):
         top_row.addWidget(time_lbl)
         top_row.addStretch()
 
-        status_info = {
-            "ONLINE":       ("Online",              "#10b981", "rgba(16, 185, 129, 0.15)"),
-            "OFFLINE":      ("Offline",             "#ef4444", "rgba(239, 68, 68, 0.15)"),
-            "WAITING":      ("Ожидание",            "#f59e0b", "rgba(245, 158, 11, 0.15)"),
-            "MAINTENANCE":  ("Тех.обсл.",           "#8b5cf6", "rgba(139, 92, 246, 0.15)"),
-        }
-        st_title, st_color, st_bg = status_info.get(status_code, (status_code, "#888888", "rgba(136, 136, 136, 0.15)"))
-
-        badge = QLabel(st_title)
+        badge = QLabel(f"{st_icon} {st_title}")
         badge.setAlignment(Qt.AlignCenter)
         badge.setStyleSheet(f"""
             QLabel {{
                 color: {st_color};
-                border: 1.5px solid {st_color};
+                border: 1px solid {st_color};
                 background-color: {st_bg};
-                border-radius: 10px;
-                padding: 3px 10px;
-                font-size: 12px;
+                border-radius: 9px;
+                padding: 2px 8px;
+                font-size: 11px;
                 font-weight: bold;
                 min-height: 18px;
             }}

@@ -233,6 +233,12 @@ def get_svg_export(theme="light"):
 def get_svg_scan(theme="light"):
     return _get_svg_wrapper('<path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>', theme)
 
+def get_svg_pause(theme="light"):
+    return _get_svg_wrapper('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>', theme)
+
+def get_svg_play(theme="light"):
+    return _get_svg_wrapper('<polygon points="6 4 20 12 6 20 6 4"/>', theme)
+
 def get_svg_bulk(theme="light"):
     return _get_svg_wrapper('<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>', theme)
 

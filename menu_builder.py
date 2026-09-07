@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt, QByteArray
 
 from constants import (
     get_svg_add_host, get_svg_add_group, get_svg_import, get_svg_export,
-    get_svg_scan, get_svg_settings, get_svg_theme, get_svg_delete
+    get_svg_scan, get_svg_pause, get_svg_settings, get_svg_theme, get_svg_delete
 )
 
 
@@ -87,12 +87,18 @@ class MenuBuilder:
         action_scan.setShortcut("F5")
         action_scan.triggered.connect(parent._force_scan)
         
+        action_pause = QAction(MenuBuilder._get_qicon(get_svg_pause(theme)), "Приостановить мониторинг", parent)
+        action_pause.setShortcut("Ctrl+Space")
+        action_pause.triggered.connect(parent._toggle_pause)
+        parent._action_pause = action_pause
+
         actions_menu.addAction(action_add_host)
         actions_menu.addAction(action_add_group)
         actions_menu.addSeparator()
         actions_menu.addAction(action_delete)
         actions_menu.addSeparator()
         actions_menu.addAction(action_scan)
+        actions_menu.addAction(action_pause)
         
         # === Меню "Вид" ===
         view_menu = menubar.addMenu("👁 Вид")

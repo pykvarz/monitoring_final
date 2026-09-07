@@ -33,6 +33,7 @@ class MonitorThread(QThread):
     scan_started = pyqtSignal()
     scan_finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
+    paused_state_changed = pyqtSignal(bool)
     
     # Новый сигнал для обновления статуса в главном потоке (Thread Safety)
     host_status_changed = pyqtSignal(str, str, object) # id, status, offline_since
@@ -43,6 +44,7 @@ class MonitorThread(QThread):
         self._config = config
         self._db_name = db_name
         self._running = True
+        self._paused = False
         self._executor: ThreadPoolExecutor = None
         self._force_scan_flag = False
         self._interrupt_flag = False  # Флаг для прерывания текущего цикла
@@ -88,8 +90,31 @@ class MonitorThread(QThread):
         """Удалить хост из кеша статусов (при удалении хоста)"""
         self._known_statuses.pop(host_id, None)
 
+    def pause(self) -> None:
+        """Приостановить мониторинг"""
+        self._paused = True
+        self.paused_state_changed.emit(True)
+
+    def resume(self) -> None:
+        """Возобновить мониторинг"""
+        self._paused = False
+        self.paused_state_changed.emit(False)
+
+    def is_paused(self) -> bool:
+        """Проверка статуса паузы"""
+        return self._paused
+
+    def toggle_pause(self) -> bool:
+        """Переключить паузу (возвращает True если теперь на паузе)"""
+        if self._paused:
+            self.resume()
+        else:
+            self.pause()
+        return self._paused
+
     def stop(self) -> None:
         self._running = False
+        self._paused = False
         if self._executor:
             try:
                 self._executor.shutdown(wait=True)
@@ -127,6 +152,10 @@ class MonitorThread(QThread):
 
             while self._running:
                 try:
+                    if self._paused:
+                        self.msleep(150)
+                        continue
+
                     # 1. Получаем актуальный список хостов из Репозитория
                     # Используем наше потокобезопасное соединение
                     hosts = self._repository.get_all(connection_name=connection_name)
@@ -200,6 +229,8 @@ class MonitorThread(QThread):
                     # Пауза
                     elapsed_wait = 0
                     while elapsed_wait < self._config.poll_interval * 1000 and self._running:
+                        if self._paused:
+                            break
                         self.msleep(100)
                         elapsed_wait += 100
                         

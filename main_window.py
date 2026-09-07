@@ -10,9 +10,10 @@ from datetime import datetime
 from typing import List, Dict
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QMessageBox, QDialog, QMenu, QInputDialog, QFrame, QSplitter
+    QMessageBox, QDialog, QMenu, QInputDialog, QFrame, QSplitter, QShortcut
 )
 from PyQt5.QtCore import QMutex, QTimer, Qt, pyqtSlot, QMutexLocker, QPoint, QModelIndex
+from PyQt5.QtGui import QKeySequence
 
 # Модели и сервисы
 from models import Host, AppConfig, HostStatus, validate_ip_or_hostname
@@ -20,6 +21,7 @@ from services import NotificationService
 from monitor_thread import MonitorThread
 from subscribers.monitor_subscriber import MonitorSubscriber
 from helpdesk_service import HelpdeskService
+from toast_notification import ToastManager
 
 # Dependency Injection
 from di_container import DIContainer, setup_container
@@ -51,7 +53,7 @@ from constants import (
     get_menu_style, SCAN_LABEL_STYLE_ACTIVE, SCAN_LABEL_STYLE_FINISHED,
     get_main_style, get_table_style, get_dashboard_style,
     get_svg_add_host, get_svg_add_group, get_svg_delete, get_svg_history,
-    get_svg_scan, get_svg_settings, get_svg_export
+    get_svg_scan, get_svg_pause, get_svg_play, get_svg_settings, get_svg_export
 )
 
 
@@ -240,6 +242,16 @@ class MainWindow(QMainWindow):
         self._btn_scan.clicked.connect(self._force_scan)
         action_bar_layout.addWidget(self._btn_scan)
 
+        self._btn_pause = QPushButton()
+        self._btn_pause.setIcon(UIComponents._get_qicon(get_svg_pause(theme)))
+        self._btn_pause.setToolTip("Приостановить мониторинг (Ctrl+Space)")
+        self._btn_pause.setStyleSheet(btn_style)
+        self._btn_pause.clicked.connect(self._toggle_pause)
+        action_bar_layout.addWidget(self._btn_pause)
+
+        self._pause_shortcut = QShortcut(QKeySequence("Ctrl+Space"), self)
+        self._pause_shortcut.activated.connect(self._toggle_pause)
+
         self._btn_settings = QPushButton()
         self._btn_settings.setIcon(UIComponents._get_qicon(get_svg_settings(theme)))
         self._btn_settings.setToolTip("Настройки (Ctrl+P)")
@@ -371,6 +383,12 @@ class MainWindow(QMainWindow):
         
         self._theme_manager.set_window_icon(self._theme_manager.get_current_theme())
         
+        # Toast Manager для современных уведомлений
+        self._toast_manager = ToastManager(
+            self,
+            get_theme_fn=lambda: self._theme_manager.get_current_theme() if self._theme_manager else "dark"
+        )
+
         # Автоматическая очистка устаревшей истории по настройке срока хранения
         self._repository.purge_old_history(self._config.history_retention_days)
 
@@ -385,6 +403,7 @@ class MainWindow(QMainWindow):
         self._monitor_thread.hosts_recovered.connect(self._on_hosts_recovered)
         self._monitor_thread.scan_started.connect(self._on_scan_started)
         self._monitor_thread.scan_finished.connect(self._on_scan_finished)
+        self._monitor_thread.paused_state_changed.connect(self._on_paused_state_changed)
         self._monitor_thread.host_status_changed.connect(self._repository.update_status)
         self._monitor_thread.error_occurred.connect(lambda e: logging.error(f"MonitorThread Error: {e}"))
         self._monitor_thread.start()
@@ -473,17 +492,25 @@ class MainWindow(QMainWindow):
     @pyqtSlot(list)
     def _on_hosts_offline(self, offline_hosts: List[str]):
         NotificationService.notify_offline_hosts(offline_hosts, self._config)
+        if hasattr(self, '_toast_manager') and self._toast_manager and self._config.notifications_enabled:
+            self._toast_manager.show_offline(offline_hosts)
 
     @pyqtSlot(list)
     def _on_hosts_recovered(self, recovered_hosts: List[str]):
         NotificationService.notify_recovered_hosts(recovered_hosts, self._config)
+        if hasattr(self, '_toast_manager') and self._toast_manager and self._config.notifications_enabled:
+            self._toast_manager.show_recovered(recovered_hosts)
 
     def _update_status_bar(self, total: int = None):
         if total is None:
             stats = self._repository.get_stats()
             total = stats.get("TOTAL", 0)
             
-        msg = f"Узлов: {total} | Мониторинг активен"
+        if self._monitor_thread and self._monitor_thread.is_paused():
+            msg = f"Узлов: {total} | ⏸ Мониторинг на паузе"
+        else:
+            msg = f"Узлов: {total} | Мониторинг активен"
+
         if self._last_scan_time:
             msg += f" | Последняя проверка: {self._last_scan_time.strftime('%H:%M:%S')}"
             
@@ -610,6 +637,82 @@ class MainWindow(QMainWindow):
         if not self._is_scanning:
             self._monitor_thread.force_scan()
             self.statusBar().showMessage("Принудительная проверка запущена...", 3000)
+
+    def _toggle_pause(self):
+        """Переключение паузы мониторинга"""
+        if self._monitor_thread:
+            self._monitor_thread.toggle_pause()
+
+    @pyqtSlot(bool)
+    def _on_paused_state_changed(self, is_paused: bool):
+        """Обработка смены состояния паузы потока мониторинга"""
+        theme = self._theme_manager.get_current_theme() if self._theme_manager else "dark"
+        is_dark = theme == "dark"
+
+        if is_paused:
+            self._btn_pause.setIcon(UIComponents._get_qicon(get_svg_play(theme)))
+            self._btn_pause.setToolTip("Возобновить мониторинг (Ctrl+Space)")
+            self._btn_pause.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {'#3b2f15' if is_dark else '#fef3c7'};
+                    border: 1px solid #f59e0b;
+                    border-radius: 6px;
+                    padding: 4px;
+                    min-width: 28px;
+                    max-width: 28px;
+                    min-height: 28px;
+                    max-height: 28px;
+                }}
+                QPushButton:hover {{
+                    background-color: {'#4d3d19' if is_dark else '#fde68a'};
+                }}
+            """)
+            if hasattr(self, '_action_pause') and self._action_pause:
+                self._action_pause.setText("Возобновить мониторинг")
+                self._action_pause.setIcon(UIComponents._get_qicon(get_svg_play(theme)))
+
+            self._scan_label.setText("⏸ На паузе")
+            self._scan_label.setStyleSheet("color: #f59e0b; font-weight: bold; padding: 2px 8px; border-radius: 4px; background: rgba(245, 158, 11, 0.15);")
+            self._update_status_bar()
+            if hasattr(self, '_toast_manager') and self._toast_manager:
+                self._toast_manager.show_pause(True)
+            self.statusBar().showMessage("Мониторинг приостановлен", 3000)
+        else:
+            btn_style = f"""
+                QPushButton {{
+                    background-color: {'#1c202a' if is_dark else '#ffffff'};
+                    border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
+                    border-radius: 6px;
+                    padding: 4px;
+                    min-width: 28px;
+                    max-width: 28px;
+                    min-height: 28px;
+                    max-height: 28px;
+                }}
+                QPushButton:hover {{
+                    background-color: {'#252b38' if is_dark else '#f1f5f9'};
+                    border-color: #3b82f6;
+                }}
+            """
+            self._btn_pause.setIcon(UIComponents._get_qicon(get_svg_pause(theme)))
+            self._btn_pause.setToolTip("Приостановить мониторинг (Ctrl+Space)")
+            self._btn_pause.setStyleSheet(btn_style)
+            if hasattr(self, '_action_pause') and self._action_pause:
+                self._action_pause.setText("Приостановить мониторинг")
+                self._action_pause.setIcon(UIComponents._get_qicon(get_svg_pause(theme)))
+
+            self._scan_label.setText("✓")
+            self._scan_label.setStyleSheet(SCAN_LABEL_STYLE_FINISHED)
+            self._update_status_bar()
+            if hasattr(self, '_toast_manager') and self._toast_manager:
+                self._toast_manager.show_pause(False)
+            self.statusBar().showMessage("Мониторинг возобновлен", 3000)
+            self._monitor_thread.force_scan()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.reposition_toasts()
 
     def update_hidden_columns_config(self):
         """Обновление конфигурации скрытых колонок (делегирование в TableSettingsManager)"""
