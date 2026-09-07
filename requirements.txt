@@ -1,0 +1,5 @@
+PyQt5
+openpyxl
+ping3
+plyer
+playwright==1.62.0

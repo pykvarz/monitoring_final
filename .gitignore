@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+*.sqlite3
+hosts.db
+hosts.db-shm
+hosts.db-wal
+
+# Logs
+*.log
+debug.log
+
+# User Data
+hosts.json
+config.json
+
+# IDE
+.idea/
+.vscode/
+
+# Archives
+*.rar
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
