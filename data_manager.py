@@ -59,6 +59,24 @@ class DataManager(QObject):
         
         return hosts
 
+    def get_hosts_by_group(self, group: str) -> List[Host]:
+        """Получение хостов по группе (SQL-фильтрация на стороне БД)"""
+        hosts = []
+        if not self.db_manager.get_db().isOpen():
+            return hosts
+
+        query = QSqlQuery()
+        query.prepare("SELECT * FROM hosts WHERE grp = :group ORDER BY status, name")
+        query.bindValue(":group", group)
+        if query.exec_():
+            while query.next():
+                hosts.append(self._record_to_host(query))
+            query.finish()
+        else:
+            logging.error(f"Ошибка фильтрации по группе '{group}': {query.lastError().text()}")
+
+        return hosts
+
     def add_host(self, host: Host) -> bool:
         """Добавление нового хоста"""
         query = QSqlQuery()

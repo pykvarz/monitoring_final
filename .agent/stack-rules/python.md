@@ -1,120 +1,51 @@
----
-description: "Python best practices and patterns for modern software development with Flask and SQLite"
-globs: **/*.py, src/**/*.py, tests/**/*.py
+﻿---
+description: "Python + PyQt5 best practices for desktop application development"
+globs: "**/*.py, tests/**/*.py"
 alwaysApply: false
 ---
-# Python Best Practices
+# Python + PyQt5 Desktop App — Stack Rules
 
-## Project Structure
-- Use src-layout with `src/your_package_name/`
-- Place tests in `tests/` directory parallel to `src/`
-- Keep configuration in `config/` or as environment variables
-- Store requirements in `requirements.txt` or `pyproject.toml`
-- Place static files in `static/` directory
-- Use `templates/` for Jinja2 templates
+## Thread Safety (критично для PyQt5)
+- UI-элементы создавать и изменять **только в главном потоке**.
+- Из фоновых QThread передавать данные через **сигналы Qt**, никогда не напрямую.
+- Для SQLite в QThread — создавать **именованное соединение** (`QSqlDatabase.addDatabase("QSQLITE", connection_name)`), не переиспользовать соединение главного потока.
+- `QMutex` / `QMutexLocker` для защиты разделяемых данных между потоками.
 
-## Code Style
-- Follow Black code formatting
-- Use isort for import sorting
-- Follow PEP 8 naming conventions:
-  - snake_case for functions and variables
-  - PascalCase for classes
-  - UPPER_CASE for constants
-- Maximum line length of 88 characters (Black default)
-- Use absolute imports over relative imports
+## Сигналы и слоты
+- Сигналы эмитить через `emit()`, слоты декорировать `@pyqtSlot(...)` с явными типами.
+- Не хранить ссылки на лямбды-обработчики сигналов в локальных переменных — они будут удалены GC.
+- Отключать сигналы в `closeEvent` или деструкторе, чтобы избежать вызовов после удаления объекта.
 
-## Type Hints
-- Use type hints for all function parameters and returns
-- Import types from `typing` module
-- Use `Optional[Type]` instead of `Type | None`
-- Use `TypeVar` for generic types
-- Define custom types in `types.py`
-- Use `Protocol` for duck typing
+## SQLite через PyQt5.QtSql
+- `QSqlQuery` — всегда вызывать `query.finish()` после итерации, чтобы освободить ресурсы.
+- Параметры передавать через `bindValue`, никогда не форматировать строку запроса напрямую (SQL-инъекция).
+- Группировать множество INSERT/UPDATE в одну транзакцию (`db.transaction()` / `db.commit()`).
+- Миграции схемы: `ALTER TABLE ... ADD COLUMN` с обработкой ошибки "column already exists" — нормально, но лучше проверять через `PRAGMA table_info`.
 
-## Flask Structure
-- Use Flask factory pattern
-- Organize routes using Blueprints
-- Use Flask-SQLAlchemy for database
-- Implement proper error handlers
-- Use Flask-Login for authentication
-- Structure views with proper separation of concerns
+## Архитектура компонентов
+- Бизнес-логика — в отдельных классах (Repository, Service), не в виджетах.
+- Виджеты подписываются на сигналы данных, не тянут данные напрямую из БД.
+- Один `QApplication` на процесс; в тестах проверять `QCoreApplication.instance()` перед созданием.
+- DI-контейнер: не использовать глобальный singleton в тестах — сбрасывать перед каждым тестом.
 
-## Database
-- Use SQLAlchemy ORM
-- Implement database migrations with Alembic
-- Use proper connection pooling
-- Define models in separate modules
-- Implement proper relationships
-- Use proper indexing strategies
+## Работа с памятью
+- Qt-объекты с `parent` удаляются автоматически. Без `parent` — следить за жизненным циклом.
+- `QThread`: перед удалением вызвать `stop()` + `wait()`, иначе краш при выходе.
+- `ThreadPoolExecutor`: вызвать `shutdown(wait=True)` при завершении приложения.
 
-## Authentication
-- Use Flask-Login for session management
-- Implement Google OAuth using Flask-OAuth
-- Hash passwords with bcrypt
-- Use proper session security
-- Implement CSRF protection
-- Use proper role-based access control
+## Стиль кода
+- PEP 8, snake_case для методов/переменных, PascalCase для классов.
+- Type hints для всех публичных методов.
+- Максимальная длина строки: 100 символов.
+- Абсолютные импорты, без `from . import`.
 
-## API Design
-- Use Flask-RESTful for REST APIs
-- Implement proper request validation
-- Use proper HTTP status codes
-- Handle errors consistently
-- Use proper response formats
-- Implement proper rate limiting
+## Тестирование
+- Тесты — `pytest`. Фикстуры в `conftest.py`.
+- UI-тесты без реального дисплея: `QApplication([])` или `QCoreApplication([])`.
+- Для SQLite в тестах — использовать `":memory:"` вместо файлового пути.
+- Мокать `PingService`, `NotificationService` через `unittest.mock.patch`.
 
-## Testing
-- Use pytest for testing
-- Write tests for all routes
-- Use pytest-cov for coverage
-- Implement proper fixtures
-- Use proper mocking with pytest-mock
-- Test all error scenarios
-
-## Security
-- Use HTTPS in production
-- Implement proper CORS
-- Sanitize all user inputs
-- Use proper session configuration
-- Implement proper logging
-- Follow OWASP guidelines
-
-## Performance
-- Use proper caching with Flask-Caching
-- Implement database query optimization
-- Use proper connection pooling
-- Implement proper pagination
-- Use background tasks for heavy operations
-- Monitor application performance
-
-## Error Handling
-- Create custom exception classes
-- Use proper try-except blocks
-- Implement proper logging
-- Return proper error responses
-- Handle edge cases properly
-- Use proper error messages
-
-## Documentation
-- Use Google-style docstrings
-- Document all public APIs
-- Keep README.md updated
-- Use proper inline comments
-- Generate API documentation
-- Document environment setup
-
-## Development Workflow
-- Use virtual environments (venv)
-- Implement pre-commit hooks
-- Use proper Git workflow
-- Follow semantic versioning
-- Use proper CI/CD practices
-- Implement proper logging
-
-## Dependencies
-- Pin dependency versions
-- Use requirements.txt for production
-- Separate dev dependencies
-- Use proper package versions
-- Regularly update dependencies
-- Check for security vulnerabilities
+## Сборка (.exe)
+- PyInstaller + `.spec`-файл под контролем версий.
+- Hidden imports для `plyer.platforms.win.notification` прописывать явно в `.spec`.
+- `CREATE_NO_WINDOW` (0x08000000) при вызове subprocess на Windows — обязательно.

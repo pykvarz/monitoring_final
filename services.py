@@ -35,20 +35,12 @@ class NotificationService(INotificationService):
         if not hosts or not config.notifications_enabled or not notification:
             return
 
-        title = "⚠️ Ошибка уведомления"
-        message = "Не удалось сформировать сообщение"
-
-        try:
-            if len(hosts) <= 3:
-                title = "⚠️ Узел недоступен"
-                message = "\n".join(hosts)
-            else:
-                title = "⚠️ Несколько узлов недоступны"
-                message = f"Недоступно устройств: {len(hosts)}"
-        except (ImportError, RuntimeError, OSError) as e:
-            logging.error(f"Ошибка отправки уведомлений: {e}", exc_info=True)
-        except Exception as e:
-            logging.error(f"Неизвестная ошибка отправки уведомлений: {e}", exc_info=True)
+        if len(hosts) <= 3:
+            title = "⚠️ Узел недоступен"
+            message = "\n".join(hosts)
+        else:
+            title = "⚠️ Несколько узлов недоступны"
+            message = f"Недоступно устройств: {len(hosts)}"
 
         try:
             if config.sound_enabled:
@@ -71,20 +63,12 @@ class NotificationService(INotificationService):
         if not hosts or not config.notifications_enabled or not notification:
             return
 
-        title = "⚠️ Ошибка уведомления"
-        message = "Не удалось сформировать сообщение"
-
-        try:
-            if len(hosts) <= 3:
-                title = "✅ Узел восстановлен"
-                message = "\n".join(hosts)
-            else:
-                title = "✅ Несколько узлов восстановлены"
-                message = f"Восстановлено устройств: {len(hosts)}"
-        except (ImportError, RuntimeError, OSError) as e:
-            logging.error(f"Ошибка отправки уведомлений: {e}", exc_info=True)
-        except Exception as e:
-            logging.error(f"Неизвестная ошибка отправки уведомлений: {e}", exc_info=True)
+        if len(hosts) <= 3:
+            title = "✅ Узел восстановлен"
+            message = "\n".join(hosts)
+        else:
+            title = "✅ Несколько узлов восстановлены"
+            message = f"Восстановлено устройств: {len(hosts)}"
 
         try:
             if config.sound_enabled:

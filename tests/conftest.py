@@ -9,6 +9,7 @@ import os
 from datetime import datetime, timezone
 from typing import List
 import uuid
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,6 +22,19 @@ from data_manager import DataManager
 from core.host_repository import HostRepository
 from models import Host, AppConfig
 from storage import StorageManager
+import di_container as _di_container_module
+
+
+@pytest.fixture(autouse=True)
+def reset_di_container():
+    """Сбрасываем глобальный DI-контейнер перед каждым тестом.
+
+    Предотвращает загрязнение состояния между тест-кейсами через
+    модульную переменную _global_container в di_container.py.
+    """
+    _di_container_module._global_container = None
+    yield
+    _di_container_module._global_container = None
 
 
 class TestFixtures:
