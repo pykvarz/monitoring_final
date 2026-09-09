@@ -19,61 +19,65 @@ DARK_SELECTION = "#2563eb"
 
 # CSS Стили
 
-def get_table_style(theme="light"):
-    if theme == "dark":
-        return f"""
-            QTableView, QTableWidget {{
-                border: 1px solid {DARK_BORDER};
-                border-radius: 8px;
-                background-color: {DARK_SURFACE};
-                alternate-background-color: #1e222e;
-                gridline-color: #232938;
-                selection-background-color: {DARK_SELECTION};
-                selection-color: white;
-                color: {DARK_TEXT};
-                show-decoration-selected: 1;
-            }}
-            QHeaderView::section {{
-                background-color: #1e2330;
-                padding: 8px 10px;
-                border: none;
-                border-bottom: 2px solid {DARK_BORDER};
-                border-right: 1px solid {DARK_BORDER};
-                font-weight: bold;
-                color: #cbd5e1;
-            }}
-        """
-    return """
-        QTableView, QTableWidget {
-            border: 1px solid #d0d7de;
+def get_table_style(theme="dark"):
+    return f"""
+        QTableView, QTableWidget {{
+            border: 1px solid {DARK_BORDER};
             border-radius: 8px;
-            background-color: white;
-            alternate-background-color: #f8f9fa;
-            gridline-color: #e2e8f0;
-            selection-background-color: #e3f2fd;
-            selection-color: #000;
+            background-color: {DARK_SURFACE};
+            alternate-background-color: #1e222e;
+            gridline-color: #232938;
+            selection-background-color: {DARK_SELECTION};
+            selection-color: white;
+            color: {DARK_TEXT};
             show-decoration-selected: 1;
-        }
-        QHeaderView::section {
-            background-color: #f6f8fa;
+        }}
+        QHeaderView::section {{
+            background-color: #1e2330;
             padding: 8px 10px;
             border: none;
-            border-bottom: 2px solid #d0d7de;
-            border-right: 1px solid #d0d7de;
+            border-bottom: 2px solid {DARK_BORDER};
+            border-right: 1px solid {DARK_BORDER};
             font-weight: bold;
-            color: #24292f;
-        }
+            color: #cbd5e1;
+        }}
+        QScrollBar:vertical {{
+            background: #151820;
+            width: 8px;
+            margin: 0px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical {{
+            background: #282e3d;
+            min-height: 20px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background: #3b82f6;
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            height: 0px;
+        }}
+        QScrollBar:horizontal {{
+            background: #151820;
+            height: 8px;
+            margin: 0px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:horizontal {{
+            background: #282e3d;
+            min-width: 20px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:horizontal:hover {{
+            background: #3b82f6;
+        }}
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+            width: 0px;
+        }}
     """
 
-def get_dashboard_style(theme="light"):
-    if theme == "dark":
-        return """
-            QFrame {
-                background-color: transparent;
-                border: none;
-                padding: 2px 0px 4px 0px;
-            }
-        """
+def get_dashboard_style(theme="dark"):
     return """
         QFrame {
             background-color: transparent;
@@ -82,7 +86,7 @@ def get_dashboard_style(theme="light"):
         }
     """
 
-def get_stat_card_style(key_or_color: str, theme="light"):
+def get_stat_card_style(key_or_color: str, theme="dark"):
     """Создание стиля для карточки статистики в стиле неоновых рамок из макета"""
     key_map = {
         COLOR_TOTAL: "total",
@@ -98,111 +102,309 @@ def get_stat_card_style(key_or_color: str, theme="light"):
     }
     card_key = key_map.get(key_or_color, "total")
 
-    if theme == "dark":
-        config = {
-            "total":       {"border": "#2563eb", "bg": "#141c2c", "hover": "#1a253a"},
-            "online":      {"border": "#10b981", "bg": "#12241e", "hover": "#183028"},
-            "waiting":     {"border": "#f59e0b", "bg": "#241e14", "hover": "#30281a"},
-            "offline":     {"border": "#ef4444", "bg": "#261619", "hover": "#341d22"},
-            "maintenance": {"border": "#8b5cf6", "bg": "#20172e", "hover": "#2a1e3d"},
-        }.get(card_key, {"border": "#3b82f6", "bg": "#141c2c", "hover": "#1a253a"})
+    config = {
+        "total":       {"border": "#2563eb", "bg": "#141c2c", "hover": "#1a253a"},
+        "online":      {"border": "#10b981", "bg": "#12241e", "hover": "#183028"},
+        "waiting":     {"border": "#f59e0b", "bg": "#241e14", "hover": "#30281a"},
+        "offline":     {"border": "#ef4444", "bg": "#261619", "hover": "#341d22"},
+        "maintenance": {"border": "#8b5cf6", "bg": "#20172e", "hover": "#2a1e3d"},
+    }.get(card_key, {"border": "#3b82f6", "bg": "#141c2c", "hover": "#1a253a"})
 
-        return f"""
-            QLabel {{
-                background-color: {config['bg']};
-                border: 1.5px solid {config['border']};
-                border-radius: 10px;
-                padding: 6px 14px 6px 12px;
-                min-width: 130px;
-            }}
-            QLabel:hover {{
-                background-color: {config['hover']};
-            }}
-        """
-    else:
-        config = {
-            "total":       {"border": "#3b82f6", "bg": "#eff6ff", "hover": "#dbeafe"},
-            "online":      {"border": "#10b981", "bg": "#ecfdf5", "hover": "#d1fae5"},
-            "waiting":     {"border": "#f59e0b", "bg": "#fffbeb", "hover": "#fef3c7"},
-            "offline":     {"border": "#ef4444", "bg": "#fef2f2", "hover": "#fee2e2"},
-            "maintenance": {"border": "#8b5cf6", "bg": "#f5f3ff", "hover": "#ede9fe"},
-        }.get(card_key, {"border": "#3b82f6", "bg": "#eff6ff", "hover": "#dbeafe"})
-
-        return f"""
-            QLabel {{
-                background-color: {config['bg']};
-                border: 1.5px solid {config['border']};
-                border-radius: 10px;
-                padding: 6px 14px 6px 12px;
-                min-width: 130px;
-            }}
-            QLabel:hover {{
-                background-color: {config['hover']};
-            }}
-        """
-
-def get_button_style(theme="light"):
-    if theme == "dark":
-        return f"""
-            QPushButton {{
-                padding: 6px 12px;
-                border: 1px solid {DARK_BORDER};
-                border-radius: 4px;
-                background-color: {DARK_SURFACE};
-                color: {DARK_TEXT};
-            }}
-            QPushButton:hover {{
-                background-color: {DARK_BORDER};
-            }}
-            QPushButton:pressed {{
-                background-color: #505050;
-            }}
-        """
-    return """
-        QPushButton {
-            padding: 6px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: white;
-        }
-        QPushButton:hover {
-            background-color: #f8f9fa;
-        }
-        QPushButton:pressed {
-            background-color: #e9ecef;
-        }
+    return f"""
+        QLabel {{
+            background-color: {config['bg']};
+            border: 1.5px solid {config['border']};
+            border-radius: 10px;
+            padding: 6px 14px 6px 12px;
+            min-width: 130px;
+        }}
+        QLabel:hover {{
+            background-color: {config['hover']};
+        }}
     """
 
-def get_main_style(theme="light"):
-    if theme == "dark":
-        return f"background-color: {DARK_BG}; color: {DARK_TEXT};"
-    return ""
+def get_button_style(theme="dark"):
+    return f"""
+        QPushButton {{
+            padding: 6px 12px;
+            border: 1px solid {DARK_BORDER};
+            border-radius: 4px;
+            background-color: {DARK_SURFACE};
+            color: {DARK_TEXT};
+        }}
+        QPushButton:hover {{
+            background-color: {DARK_BORDER};
+        }}
+        QPushButton:pressed {{
+            background-color: #505050;
+        }}
+    """
 
-def get_menu_style(theme="light"):
-    if theme == "dark":
-        return f"""
-            QMenu {{
-                background-color: {DARK_SURFACE};
-                color: {DARK_TEXT};
-                border: 1px solid {DARK_BORDER};
-                padding: 5px;
-            }}
-            QMenu::item:selected {{
-                background-color: {DARK_SELECTION};
-            }}
-        """
-    return """
-        QMenu {
-            background-color: white;
-            border: 1px solid #ddd;
-            padding: 5px;
-        }
-        QMenu::item {
-            padding: 8px 25px 8px 20px;
-        }
-        QMenu::item:selected {
-            background-color: #e3f2fd;
-        }
+def get_main_style(theme="dark"):
+    font_family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
+    return f"""
+        QWidget {{
+            font-family: {font_family};
+        }}
+        QMainWindow, QDialog {{
+            background-color: {DARK_BG};
+            color: {DARK_TEXT};
+        }}
+        QLabel {{
+            color: {DARK_TEXT};
+        }}
+        QMenuBar {{
+            background-color: {DARK_BG};
+            color: {DARK_TEXT};
+            border-bottom: 1px solid {DARK_BORDER};
+            padding: 2px 4px;
+        }}
+        QMenuBar::item {{
+            background-color: transparent;
+            color: {DARK_TEXT};
+            padding: 4px 10px;
+            border-radius: 4px;
+        }}
+        QMenuBar::item:selected {{
+            background-color: #252b38;
+            color: #ffffff;
+        }}
+        QMenuBar::item:pressed {{
+            background-color: #1c202a;
+        }}
+        QMenu {{
+            background-color: {DARK_SURFACE};
+            color: {DARK_TEXT};
+            border: 1px solid {DARK_BORDER};
+            border-radius: 6px;
+            padding: 4px 0px;
+        }}
+        QMenu::item {{
+            padding: 6px 28px 6px 24px;
+            color: {DARK_TEXT};
+            background-color: transparent;
+        }}
+        QMenu::item:selected {{
+            background-color: {DARK_SELECTION};
+            color: #ffffff;
+        }}
+        QMenu::item:disabled {{
+            color: {DARK_TEXT_SECONDARY};
+        }}
+        QMenu::separator {{
+            height: 1px;
+            background-color: {DARK_BORDER};
+            margin: 4px 8px;
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {DARK_SURFACE};
+            color: {DARK_TEXT};
+            border: 1px solid {DARK_BORDER};
+            border-radius: 6px;
+            selection-background-color: {DARK_SELECTION};
+            selection-color: #ffffff;
+            padding: 4px;
+            outline: none;
+        }}
+        QComboBox QAbstractItemView::item {{
+            min-height: 24px;
+            padding: 3px 8px;
+            color: {DARK_TEXT};
+        }}
+        QComboBox QAbstractItemView::item:hover,
+        QComboBox QAbstractItemView::item:selected {{
+            background-color: {DARK_SELECTION};
+            color: #ffffff;
+        }}
+        QLineEdit, QSpinBox {{
+            background-color: #1c202a;
+            color: #f1f5f9;
+            border: 1px solid #282e3d;
+            border-radius: 6px;
+            padding: 4px 8px;
+            selection-background-color: #2563eb;
+        }}
+        QLineEdit:focus, QSpinBox:focus {{
+            border-color: #3b82f6;
+        }}
+        QGroupBox {{
+            font-weight: bold;
+            color: #f1f5f9;
+            border: 1px solid #282e3d;
+            border-radius: 6px;
+            margin-top: 12px;
+            padding-top: 14px;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            left: 10px;
+            padding: 0 4px;
+            color: #f1f5f9;
+        }}
+        QCheckBox {{
+            color: #f1f5f9;
+            spacing: 6px;
+        }}
+        QDialogButtonBox QPushButton, QMessageBox QPushButton {{
+            background-color: #1c202a;
+            border: 1px solid #282e3d;
+            border-radius: 6px;
+            padding: 5px 16px;
+            color: #f1f5f9;
+            font-weight: 500;
+            min-width: 65px;
+        }}
+        QDialogButtonBox QPushButton:hover, QMessageBox QPushButton:hover {{
+            background-color: #252b38;
+            border-color: #3b82f6;
+        }}
+        QDialogButtonBox QPushButton:pressed, QMessageBox QPushButton:pressed {{
+            background-color: #151820;
+        }}
+        QScrollBar:vertical {{
+            background-color: #151820;
+            width: 10px;
+            margin: 0px;
+            border: none;
+        }}
+        QScrollBar::handle:vertical {{
+            background-color: #282e3d;
+            min-height: 20px;
+            border-radius: 5px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background-color: #3b82f6;
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            height: 0px;
+            border: none;
+        }}
+        QScrollBar:horizontal {{
+            background-color: #151820;
+            height: 10px;
+            margin: 0px;
+            border: none;
+        }}
+        QScrollBar::handle:horizontal {{
+            background-color: #282e3d;
+            min-width: 20px;
+            border-radius: 5px;
+        }}
+        QScrollBar::handle:horizontal:hover {{
+            background-color: #3b82f6;
+        }}
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+            width: 0px;
+            border: none;
+        }}
+        QToolTip {{
+            background-color: #1c202a;
+            color: #f1f5f9;
+            border: 1px solid {DARK_BORDER};
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+        }}
+        QSplitter::handle {{
+            background-color: transparent;
+            width: 3px;
+        }}
+        QSplitter::handle:hover {{
+            background-color: #3b82f6;
+        }}
+    """
+
+def get_menubar_style(theme="dark"):
+    return f"""
+        QMenuBar {{
+            background-color: {DARK_BG};
+            color: {DARK_TEXT};
+            border-bottom: 1px solid {DARK_BORDER};
+            padding: 2px 4px;
+        }}
+        QMenuBar::item {{
+            background-color: transparent;
+            color: {DARK_TEXT};
+            padding: 5px 10px;
+            border-radius: 4px;
+        }}
+        QMenuBar::item:selected {{
+            background-color: #252b38;
+            color: #ffffff;
+        }}
+        QMenuBar::item:pressed {{
+            background-color: #1c202a;
+        }}
+    """
+
+def get_combobox_style(theme="dark"):
+    return f"""
+        QComboBox {{
+            border: 1px solid {DARK_BORDER};
+            border-radius: 6px;
+            padding: 3px 10px;
+            background-color: {DARK_SURFACE};
+            color: {DARK_TEXT};
+            font-size: 12px;
+        }}
+        QComboBox:hover {{
+            border-color: #3b82f6;
+        }}
+        QComboBox::drop-down {{
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 20px;
+            border: none;
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {DARK_SURFACE};
+            color: {DARK_TEXT};
+            border: 1px solid {DARK_BORDER};
+            border-radius: 6px;
+            selection-background-color: {DARK_SELECTION};
+            selection-color: #ffffff;
+            padding: 4px;
+            outline: none;
+        }}
+        QComboBox QAbstractItemView::item {{
+            min-height: 24px;
+            padding: 3px 8px;
+            color: {DARK_TEXT};
+        }}
+        QComboBox QAbstractItemView::item:hover,
+        QComboBox QAbstractItemView::item:selected {{
+            background-color: {DARK_SELECTION};
+            color: #ffffff;
+        }}
+    """
+
+def get_menu_style(theme="dark"):
+    return f"""
+        QMenu {{
+            background-color: {DARK_SURFACE};
+            color: {DARK_TEXT};
+            border: 1px solid {DARK_BORDER};
+            border-radius: 6px;
+            padding: 4px 0px;
+        }}
+        QMenu::item {{
+            padding: 6px 28px 6px 24px;
+            color: {DARK_TEXT};
+            background-color: transparent;
+        }}
+        QMenu::item:selected {{
+            background-color: {DARK_SELECTION};
+            color: #ffffff;
+        }}
+        QMenu::item:disabled {{
+            color: {DARK_TEXT_SECONDARY};
+        }}
+        QMenu::separator {{
+            height: 1px;
+            background-color: {DARK_BORDER};
+            margin: 4px 8px;
+        }}
     """
 
 SCAN_LABEL_STYLE_ACTIVE = "color: #007bff; font-weight: bold;"
@@ -210,45 +412,48 @@ SCAN_LABEL_STYLE_FINISHED = "color: #28a745;"
 
 # SVG Иконки (Paths)
 # SVG Иконки (Paths в стиле Lucide)
-def _get_svg_wrapper(path_data, theme="light", size=16, stroke_width=2):
-    color = "#e1e1e1" if theme == "dark" else "#24292f"
+def _get_svg_wrapper(path_data, theme="dark", size=16, stroke_width=2):
+    color = "#e1e1e1"
     return f"""
     <svg viewBox="0 0 24 24" width="{size}" height="{size}" fill="none" stroke="{color}" stroke-width="{stroke_width}" stroke-linecap="round" stroke-linejoin="round">
         {path_data}
     </svg>
     """
 
-def get_svg_add_host(theme="light"):
+def get_svg_add_host(theme="dark"):
     return _get_svg_wrapper('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>', theme)
 
-def get_svg_add_group(theme="light"):
+def get_svg_add_group(theme="dark"):
     return _get_svg_wrapper('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>', theme)
 
-def get_svg_import(theme="light"):
+def get_svg_import(theme="dark"):
     return _get_svg_wrapper('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>', theme)
 
-def get_svg_export(theme="light"):
+def get_svg_export(theme="dark"):
     return _get_svg_wrapper('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>', theme)
 
-def get_svg_scan(theme="light"):
+def get_svg_scan(theme="dark"):
     return _get_svg_wrapper('<path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>', theme)
 
-def get_svg_pause(theme="light"):
+def get_svg_pause(theme="dark"):
     return _get_svg_wrapper('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>', theme)
 
-def get_svg_play(theme="light"):
+def get_svg_play(theme="dark"):
     return _get_svg_wrapper('<polygon points="6 4 20 12 6 20 6 4"/>', theme)
 
-def get_svg_bulk(theme="light"):
+def get_svg_bulk(theme="dark"):
     return _get_svg_wrapper('<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>', theme)
 
-def get_svg_settings(theme="light"):
+def get_svg_settings(theme="dark"):
     return _get_svg_wrapper('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>', theme)
 
-def get_svg_delete(theme="light"):
+def get_svg_delete(theme="dark"):
     return _get_svg_wrapper('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>', theme)
 
-def get_svg_edit(theme="light"):
+def get_svg_refresh(theme="dark"):
+    return _get_svg_wrapper('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>', theme)
+
+def get_svg_edit(theme="dark"):
     return _get_svg_wrapper('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/>', theme)
 
 def get_svg_theme(theme="light"):
@@ -256,14 +461,14 @@ def get_svg_theme(theme="light"):
         return _get_svg_wrapper('<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>', theme)
     return _get_svg_wrapper('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>', theme)
 
-def get_svg_ping(theme="light"):
+def get_svg_ping(theme="dark"):
     return _get_svg_wrapper('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>', theme)
 
-def get_svg_total(theme="light"):
+def get_svg_total(theme="dark"):
     # Icon: Server
     return _get_svg_wrapper('<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', theme)
 
-def get_svg_history(theme="light"):
+def get_svg_history(theme="dark"):
     # Icon: Clock/History
     return _get_svg_wrapper('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', theme)
 

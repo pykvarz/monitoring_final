@@ -165,8 +165,7 @@ class HostTableModel(QAbstractTableModel):
             if col == 0:
                 return ""
             elif col == 1:
-                prefix = "" if host.notifications_enabled else "🔕 "
-                return f"{prefix}{host.name}"
+                return host.name
             elif col == 2:
                 return host.ip
             elif col == 3:
@@ -174,7 +173,7 @@ class HostTableModel(QAbstractTableModel):
             elif col == 4:
                 return host.group
             elif col == 5:
-                if host.status == "OFFLINE" and host.offline_since:
+                if host.status in ("OFFLINE", "WAITING") and host.offline_since:
                     try:
                         utc_now = datetime.now(timezone.utc)
                         offline_since = datetime.fromisoformat(host.offline_since)
@@ -192,27 +191,18 @@ class HostTableModel(QAbstractTableModel):
             if recovered_at and host.status == "ONLINE":
                 age = (datetime.now(timezone.utc) - recovered_at).total_seconds()
                 if age < self._recovery_highlight_seconds:
-                    color = QColor("#065f46" if self._theme == "dark" else "#d1fae5")
+                    color = QColor("#0d3829")
                     return QBrush(color)
                 else:
                     del self._recently_recovered[host.id]
 
-            if self._theme == "dark":
-                if host.status == "OFFLINE":
-                    return QBrush(QColor("#3d1419"))  # Темно-красный оттенок для упавших узлов (как в макете)
-                elif host.status == "WAITING":
-                    return QBrush(QColor("#382310"))  # Темно-янтарный для ожидания
-                elif host.status == "MAINTENANCE":
-                    return QBrush(QColor("#281638"))  # Темно-фиолетовый для ТО
-                return QVariant()  # Для ONLINE стандартный фон чередования строк
-            else:
-                if host.status == "OFFLINE":
-                    return QBrush(QColor("#fee2e2"))
-                elif host.status == "WAITING":
-                    return QBrush(QColor("#fef3c7"))
-                elif host.status == "MAINTENANCE":
-                    return QBrush(QColor("#f3e8ff"))
-                return QVariant()
+            if host.status == "OFFLINE":
+                return QBrush(QColor("#24161a"))  # Деликатный винный оттенок для читаемости
+            elif host.status == "WAITING":
+                return QBrush(QColor("#241d14"))  # Деликатный янтарный
+            elif host.status == "MAINTENANCE":
+                return QBrush(QColor("#1e1728"))  # Деликатный фиолетовый
+            return QVariant()  # Для ONLINE стандартный фон чередования строк
 
         elif role == Qt.TextAlignmentRole:
             if col == 0:
@@ -220,9 +210,7 @@ class HostTableModel(QAbstractTableModel):
             return Qt.AlignLeft | Qt.AlignVCenter
 
         elif role == Qt.ForegroundRole:
-            if self._theme == "dark":
-                return QBrush(QColor("#f1f5f9"))
-            return QBrush(QColor("#1e293b"))
+            return QBrush(QColor("#f1f5f9"))
 
         elif role == Qt.ToolTipRole:
             if col == 0:

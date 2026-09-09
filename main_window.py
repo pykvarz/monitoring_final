@@ -21,8 +21,6 @@ from services import NotificationService
 from monitor_thread import MonitorThread
 from subscribers.monitor_subscriber import MonitorSubscriber
 from helpdesk_service import HelpdeskService
-from toast_notification import ToastManager
-
 # Dependency Injection
 from di_container import DIContainer, setup_container
 from interfaces import IStorageRepository, INotificationService
@@ -39,21 +37,22 @@ from history_views import HostHistoryDialog, HistoryDialog, EventLogPanel
 
 # Менеджеры
 from filter_manager import FilterManager
-from theme_manager import ThemeManager
+from theme_manager import ThemeManager, set_dark_titlebar
 from dashboard_manager import DashboardManager
 from export_import_manager import ExportImportManager
 from context_menu_manager import ContextMenuManager
 from table_settings_manager import TableSettingsManager
 
-# Builders
-from menu_builder import MenuBuilder
+
 
 # Константы и стили
 from constants import (
-    get_menu_style, SCAN_LABEL_STYLE_ACTIVE, SCAN_LABEL_STYLE_FINISHED,
+    get_combobox_style,
+    SCAN_LABEL_STYLE_ACTIVE, SCAN_LABEL_STYLE_FINISHED,
     get_main_style, get_table_style, get_dashboard_style,
     get_svg_add_host, get_svg_add_group, get_svg_delete, get_svg_history,
-    get_svg_scan, get_svg_pause, get_svg_play, get_svg_settings, get_svg_export
+    get_svg_scan, get_svg_pause, get_svg_play, get_svg_settings,
+    get_svg_import, get_svg_export
 )
 
 
@@ -180,8 +179,8 @@ class MainWindow(QMainWindow):
             
         self._main_layout.addWidget(self._top_frame)
 
-        # === Главное Меню ===
-        menubar = MenuBuilder.create_menu_bar(self, theme)
+        # Менюбар скрыт — все действия на панели быстрых действий
+        self.menuBar().setVisible(False)
 
         # === Панель действий + Поиск и Фильтры (как в макете) ===
         action_bar = QWidget()
@@ -189,22 +188,22 @@ class MainWindow(QMainWindow):
         action_bar_layout.setContentsMargins(0, 2, 0, 4)
         action_bar_layout.setSpacing(6)
 
-        is_dark = theme == "dark"
-        btn_style = f"""
-            QPushButton {{
-                background-color: {'#1c202a' if is_dark else '#ffffff'};
-                border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
+
+        btn_style = """
+            QPushButton {
+                background-color: #1c202a;
+                border: 1px solid #282e3d;
                 border-radius: 6px;
                 padding: 4px;
                 min-width: 28px;
                 max-width: 28px;
                 min-height: 28px;
                 max-height: 28px;
-            }}
-            QPushButton:hover {{
-                background-color: {'#252b38' if is_dark else '#f1f5f9'};
+            }
+            QPushButton:hover {
+                background-color: #252b38;
                 border-color: #3b82f6;
-            }}
+            }
         """
 
         self._btn_add_host = QPushButton()
@@ -227,6 +226,17 @@ class MainWindow(QMainWindow):
         self._btn_delete.setStyleSheet(btn_style)
         self._btn_delete.clicked.connect(self._delete_selected)
         action_bar_layout.addWidget(self._btn_delete)
+
+        self._tb_separators = []
+        def _make_sep():
+            sep = QFrame()
+            sep.setFrameShape(QFrame.VLine)
+            sep.setFrameShadow(QFrame.Plain)
+            sep.setStyleSheet("color: #282e3d; max-height: 20px; margin: 4px 4px;")
+            self._tb_separators.append(sep)
+            action_bar_layout.addWidget(sep)
+
+        _make_sep()
 
         self._btn_history = QPushButton()
         self._btn_history.setIcon(UIComponents._get_qicon(get_svg_history(theme)))
@@ -252,12 +262,21 @@ class MainWindow(QMainWindow):
         self._pause_shortcut = QShortcut(QKeySequence("Ctrl+Space"), self)
         self._pause_shortcut.activated.connect(self._toggle_pause)
 
+        _make_sep()
+
         self._btn_settings = QPushButton()
         self._btn_settings.setIcon(UIComponents._get_qicon(get_svg_settings(theme)))
         self._btn_settings.setToolTip("Настройки (Ctrl+P)")
         self._btn_settings.setStyleSheet(btn_style)
         self._btn_settings.clicked.connect(self._open_settings)
         action_bar_layout.addWidget(self._btn_settings)
+
+        self._btn_import = QPushButton()
+        self._btn_import.setIcon(UIComponents._get_qicon(get_svg_import(theme)))
+        self._btn_import.setToolTip("Импорт из Excel (Ctrl+I)")
+        self._btn_import.setStyleSheet(btn_style)
+        self._btn_import.clicked.connect(self._import_from_excel)
+        action_bar_layout.addWidget(self._btn_import)
 
         self._btn_export = QPushButton()
         self._btn_export.setIcon(UIComponents._get_qicon(get_svg_export(theme)))
@@ -275,27 +294,17 @@ class MainWindow(QMainWindow):
 
         self._group_filter.setFixedHeight(28)
         self._search_edit.setFixedHeight(28)
-        self._group_filter.setStyleSheet(f"""
-            QComboBox {{
-                border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
+        self._group_filter.setStyleSheet(get_combobox_style(theme))
+        self._search_edit.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #282e3d;
                 border-radius: 6px;
                 padding: 3px 10px;
-                background-color: {'#1c202a' if is_dark else '#ffffff'};
-                color: {'#f1f5f9' if is_dark else '#1e293b'};
-                font-size: 12px;
-                min-width: 140px;
-            }}
-        """)
-        self._search_edit.setStyleSheet(f"""
-            QLineEdit {{
-                border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
-                border-radius: 6px;
-                padding: 3px 10px;
-                background-color: {'#1c202a' if is_dark else '#ffffff'};
-                color: {'#f1f5f9' if is_dark else '#1e293b'};
+                background-color: #1c202a;
+                color: #f1f5f9;
                 font-size: 12px;
                 min-width: 180px;
-            }}
+            }
         """)
 
         action_bar_layout.addWidget(self._group_filter)
@@ -382,12 +391,6 @@ class MainWindow(QMainWindow):
         #     btn_bulk.clicked.connect(lambda: self._context_menu_manager.show_bulk_menu(btn_bulk))
         
         self._theme_manager.set_window_icon(self._theme_manager.get_current_theme())
-        
-        # Toast Manager для современных уведомлений
-        self._toast_manager = ToastManager(
-            self,
-            get_theme_fn=lambda: self._theme_manager.get_current_theme() if self._theme_manager else "dark"
-        )
 
         # Автоматическая очистка устаревшей истории по настройке срока хранения
         self._repository.purge_old_history(self._config.history_retention_days)
@@ -492,14 +495,10 @@ class MainWindow(QMainWindow):
     @pyqtSlot(list)
     def _on_hosts_offline(self, offline_hosts: List[str]):
         NotificationService.notify_offline_hosts(offline_hosts, self._config)
-        if hasattr(self, '_toast_manager') and self._toast_manager and self._config.notifications_enabled:
-            self._toast_manager.show_offline(offline_hosts)
 
     @pyqtSlot(list)
     def _on_hosts_recovered(self, recovered_hosts: List[str]):
         NotificationService.notify_recovered_hosts(recovered_hosts, self._config)
-        if hasattr(self, '_toast_manager') and self._toast_manager and self._config.notifications_enabled:
-            self._toast_manager.show_recovered(recovered_hosts)
 
     def _update_status_bar(self, total: int = None):
         if total is None:
@@ -591,8 +590,7 @@ class MainWindow(QMainWindow):
         # Typically Export ALL is safer default unless "Export View" asked.
         self._export_import_manager.export_to_excel(hosts)
 
-    def _toggle_theme(self):
-        if self._theme_manager: self._theme_manager.toggle_theme()
+
 
     def _open_history_journal(self):
         """Открыть общий журнал событий (падения/восстановления) по всем узлам"""
@@ -646,15 +644,14 @@ class MainWindow(QMainWindow):
     @pyqtSlot(bool)
     def _on_paused_state_changed(self, is_paused: bool):
         """Обработка смены состояния паузы потока мониторинга"""
-        theme = self._theme_manager.get_current_theme() if self._theme_manager else "dark"
-        is_dark = theme == "dark"
+        theme = "dark"
 
         if is_paused:
             self._btn_pause.setIcon(UIComponents._get_qicon(get_svg_play(theme)))
             self._btn_pause.setToolTip("Возобновить мониторинг (Ctrl+Space)")
-            self._btn_pause.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {'#3b2f15' if is_dark else '#fef3c7'};
+            self._btn_pause.setStyleSheet("""
+                QPushButton {
+                    background-color: #3b2f15;
                     border: 1px solid #f59e0b;
                     border-radius: 6px;
                     padding: 4px;
@@ -662,10 +659,10 @@ class MainWindow(QMainWindow):
                     max-width: 28px;
                     min-height: 28px;
                     max-height: 28px;
-                }}
-                QPushButton:hover {{
-                    background-color: {'#4d3d19' if is_dark else '#fde68a'};
-                }}
+                }
+                QPushButton:hover {
+                    background-color: #4d3d19;
+                }
             """)
             if hasattr(self, '_action_pause') and self._action_pause:
                 self._action_pause.setText("Возобновить мониторинг")
@@ -674,25 +671,23 @@ class MainWindow(QMainWindow):
             self._scan_label.setText("⏸ На паузе")
             self._scan_label.setStyleSheet("color: #f59e0b; font-weight: bold; padding: 2px 8px; border-radius: 4px; background: rgba(245, 158, 11, 0.15);")
             self._update_status_bar()
-            if hasattr(self, '_toast_manager') and self._toast_manager:
-                self._toast_manager.show_pause(True)
             self.statusBar().showMessage("Мониторинг приостановлен", 3000)
         else:
-            btn_style = f"""
-                QPushButton {{
-                    background-color: {'#1c202a' if is_dark else '#ffffff'};
-                    border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
+            btn_style = """
+                QPushButton {
+                    background-color: #1c202a;
+                    border: 1px solid #282e3d;
                     border-radius: 6px;
                     padding: 4px;
                     min-width: 28px;
                     max-width: 28px;
                     min-height: 28px;
                     max-height: 28px;
-                }}
-                QPushButton:hover {{
-                    background-color: {'#252b38' if is_dark else '#f1f5f9'};
+                }
+                QPushButton:hover {
+                    background-color: #252b38;
                     border-color: #3b82f6;
-                }}
+                }
             """
             self._btn_pause.setIcon(UIComponents._get_qicon(get_svg_pause(theme)))
             self._btn_pause.setToolTip("Приостановить мониторинг (Ctrl+Space)")
@@ -704,15 +699,11 @@ class MainWindow(QMainWindow):
             self._scan_label.setText("✓")
             self._scan_label.setStyleSheet(SCAN_LABEL_STYLE_FINISHED)
             self._update_status_bar()
-            if hasattr(self, '_toast_manager') and self._toast_manager:
-                self._toast_manager.show_pause(False)
             self.statusBar().showMessage("Мониторинг возобновлен", 3000)
             self._monitor_thread.force_scan()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if hasattr(self, '_toast_manager') and self._toast_manager:
-            self._toast_manager.reposition_toasts()
 
     def update_hidden_columns_config(self):
         """Обновление конфигурации скрытых колонок (делегирование в TableSettingsManager)"""
@@ -742,4 +733,8 @@ class MainWindow(QMainWindow):
             
         HelpdeskService.shutdown()
         event.accept()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        set_dark_titlebar(self, True)
 

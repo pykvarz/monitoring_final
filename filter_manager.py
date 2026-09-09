@@ -147,7 +147,7 @@ class FilterManager:
         current_group = self._group_filter.currentText()
         self._group_filter.blockSignals(True)  # Блокируем сигналы для избежания лишних перерисовок
         self._group_filter.clear()
-        self._group_filter.addItem("📁 Все группы")
+        self._group_filter.addItem("Все группы")
         self._group_filter.addItems(groups)
         
         # Восстанавливаем предыдущий выбор, если возможно

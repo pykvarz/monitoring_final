@@ -177,6 +177,148 @@ class TestOfflineSinceReset(unittest.TestCase):
         self.assertTrue(upd)
 
 
+class TestStatusMachineStuckOnline(unittest.TestCase):
+    """Регрессия: хост не переходил из ONLINE в WAITING/OFFLINE.
+
+    Корневая причина: _record_to_host() принудительно обнулял offline_since
+    для хостов со статусом ONLINE. Статус-машина в MonitorThread на каждом
+    цикле видела offline_since=None, ставила offline_since=now(), но длительность
+    простоя всегда была ~0 — пороги waiting_timeout/offline_timeout никогда
+    не достигались.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def setUp(self):
+        self.db_manager, self.data_manager, self.repository, _ = (
+            TestFixtures.create_repository_with_data(0)
+        )
+        self.config = MagicMock()
+        self.config.waiting_timeout = 60
+        self.config.offline_timeout = 300
+        self.config.max_workers = 2
+
+    def tearDown(self):
+        TestFixtures.cleanup_db(self.db_manager)
+
+    def test_offline_since_preserved_for_online_hosts(self):
+        """offline_since должен читаться из БД даже если status=ONLINE.
+
+        Статус-машина пишет offline_since при первом неудачном пинге,
+        но status ещё остаётся ONLINE (порог не достигнут). При следующем
+        чтении offline_since не должен обнуляться.
+        """
+        host = _make_host(id='h1', ip='10.0.0.1')
+        self.data_manager.add_host(host)
+
+        # Эмулируем: первый пинг не прошёл, статус-машина записала
+        # offline_since, но статус всё ещё ONLINE (порог не достигнут)
+        offline_ts = datetime(2026, 9, 9, 10, 0, 0, tzinfo=timezone.utc).isoformat()
+        self.data_manager.update_host_status('h1', 'ONLINE', offline_ts)
+
+        # Читаем обратно — offline_since НЕ должен быть обнулён
+        hosts = self.data_manager.get_all_hosts()
+        self.assertEqual(len(hosts), 1)
+        self.assertEqual(hosts[0].status, 'ONLINE')
+        self.assertIsNotNone(hosts[0].offline_since,
+                             "offline_since обнулился при чтении ONLINE-хоста — "
+                             "статус-машина не сможет отследить длительность простоя")
+        self.assertEqual(hosts[0].offline_since, offline_ts)
+
+    def test_status_machine_transitions_to_waiting(self):
+        """Хост переходит из ONLINE в WAITING немедленно при первой потере.
+    
+        Шаг 1: При первом сбое фиксируем offline_since и сразу ставим WAITING.
+        """
+        mt = MonitorThread(self.repository, self.config, db_name=":memory:")
+    
+        # Цикл 1: host ONLINE, пинг не прошёл
+        t1 = datetime(2026, 9, 9, 10, 0, 0, tzinfo=timezone.utc)
+        host = _make_host(status='ONLINE', offline_since=None)
+        ns, os_val, upd = mt._calculate_status(host, 'OFFLINE', t1)
+    
+        # Статус сразу WAITING, offline_since установлен
+        self.assertEqual(ns, 'WAITING')
+        self.assertIsNotNone(os_val)
+        self.assertTrue(upd)
+    
+        # Цикл 2: через 90 секунд (> waiting_timeout=60)
+        t2 = t1 + timedelta(seconds=90)
+        host2 = _make_host(status='WAITING', offline_since=os_val)
+        ns2, os_val2, upd2 = mt._calculate_status(host2, 'OFFLINE', t2)
+
+        self.assertEqual(ns2, 'WAITING',
+                         "Хост должен был перейти в WAITING после 90 секунд простоя")
+        self.assertEqual(os_val2, os_val,
+                         "offline_since не должен сбрасываться между циклами")
+
+    def test_status_machine_transitions_to_offline(self):
+        """Хост должен перейти из WAITING в OFFLINE после offline_timeout."""
+        mt = MonitorThread(self.repository, self.config, db_name=":memory:")
+
+        t_start = datetime(2026, 9, 9, 10, 0, 0, tzinfo=timezone.utc)
+        offline_since = t_start.isoformat()
+
+        # Через 310 сек (> offline_timeout=300)
+        t_now = t_start + timedelta(seconds=310)
+        host = _make_host(status='WAITING', offline_since=offline_since)
+        ns, os_val, upd = mt._calculate_status(host, 'OFFLINE', t_now)
+
+        self.assertEqual(ns, 'OFFLINE',
+                         "Хост должен был перейти в OFFLINE после 310 секунд простоя")
+
+
+class TestLastSeenMapping(unittest.TestCase):
+    """Регрессия: last_seen не маппился из БД → heartbeat throttling не работал."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def setUp(self):
+        self.db_manager, self.data_manager, self.repository, _ = (
+            TestFixtures.create_repository_with_data(0)
+        )
+
+    def tearDown(self):
+        TestFixtures.cleanup_db(self.db_manager)
+
+    def test_last_seen_read_from_db(self):
+        """last_seen должен корректно читаться из БД после update_host_status."""
+        host = _make_host(id='h1', ip='10.0.0.1')
+        self.data_manager.add_host(host)
+
+        # update_host_status пишет last_seen = datetime.now().isoformat()
+        self.data_manager.update_host_status('h1', 'ONLINE')
+
+        hosts = self.data_manager.get_all_hosts()
+        self.assertEqual(len(hosts), 1)
+        self.assertIsNotNone(hosts[0].last_seen,
+                             "last_seen не читается из БД — heartbeat throttling сломан")
+
+
+class TestHelpdeskServiceArgs(unittest.TestCase):
+    """Регрессия: HelpdeskService вызывался с Host вместо list[str]."""
+
+    def test_process_offline_expects_list(self):
+        """process_offline принимает list строк, не объект Host."""
+        from helpdesk_service import HelpdeskService
+        config = MagicMock()
+        config.helpdesk_enabled = False  # Не будет реально отправлять
+
+        # Не должно бросать TypeError
+        HelpdeskService.process_offline(["test_host"], config)
+
+    def test_process_recovered_expects_list(self):
+        """process_recovered принимает list строк, не объект Host."""
+        from helpdesk_service import HelpdeskService
+        config = MagicMock()
+        config.helpdesk_enabled = False
+
+        HelpdeskService.process_recovered(["test_host"], config)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
-

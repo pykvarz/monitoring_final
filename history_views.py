@@ -20,7 +20,13 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor, QBrush
 
 from models import HostStatus
-from constants import get_table_style
+from constants import (
+    get_table_style, get_svg_delete, get_svg_refresh,
+    get_combobox_style, get_main_style, get_button_style,
+    COLOR_ONLINE, COLOR_OFFLINE, COLOR_WAITING, COLOR_MAINTENANCE
+)
+from theme_manager import set_dark_titlebar
+from ui_components import UIComponents
 
 
 def _status_title(status_code: str) -> str:
@@ -81,10 +87,10 @@ class EventCardWidget(QFrame):
     def __init__(self, when_str: str, full_time: str, host_name: str, status_code: str, theme="dark"):
         super().__init__()
         status_info = {
-            "ONLINE":       ("Online",              "#10b981", "rgba(16, 185, 129, 0.15)", "✓"),
-            "OFFLINE":      ("Offline",             "#ef4444", "rgba(239, 68, 68, 0.15)", "⚠️"),
-            "WAITING":      ("Ожидание",            "#f59e0b", "rgba(245, 158, 11, 0.15)", "⏳"),
-            "MAINTENANCE":  ("Тех.обсл.",           "#8b5cf6", "rgba(139, 92, 246, 0.15)", "🔧"),
+            "ONLINE":       ("Online",              COLOR_ONLINE, "rgba(16, 185, 129, 0.15)", "●"),
+            "OFFLINE":      ("Offline",             COLOR_OFFLINE, "rgba(239, 68, 68, 0.15)", "●"),
+            "WAITING":      ("Ожидание",            COLOR_WAITING, "rgba(245, 158, 11, 0.15)", "●"),
+            "MAINTENANCE":  ("Тех.обсл.",           COLOR_MAINTENANCE, "rgba(139, 92, 246, 0.15)", "●"),
         }
         st_title, st_color, st_bg, st_icon = status_info.get(status_code, (status_code, "#888888", "rgba(136, 136, 136, 0.15)", "•"))
 
@@ -141,9 +147,9 @@ class EventCardWidget(QFrame):
         layout.addWidget(name_lbl)
 
 
-class EventLogPanel(QWidget):
+class EventLogPanel(QFrame):
     """
-    Правая боковая панель: живой журнал событий по ВСЕМ узлам (в стиле карточек из макета).
+    Правая боковая панель: живой журнал событий по ВСЕМ узлам.
     Показывает последние события с авто-обновлением каждые 10 сек.
     """
 
@@ -159,6 +165,8 @@ class EventLogPanel(QWidget):
         super().__init__(parent)
         self._repository = repository
         self._theme = theme
+        self._btn_clear = None
+        self._btn_refresh = None
         self._init_ui()
 
         self._refresh_timer = QTimer(self)
@@ -171,6 +179,7 @@ class EventLogPanel(QWidget):
     def _init_ui(self):
         self.setMinimumWidth(250)
         self.setMaximumWidth(16777215)
+        self.setFrameShape(QFrame.StyledPanel)
         
         is_dark = self._theme == "dark"
         self.setStyleSheet(f"""
@@ -181,13 +190,14 @@ class EventLogPanel(QWidget):
             }}
         """)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 8)
-        layout.setSpacing(6)
+        layout.setContentsMargins(12, 12, 12, 10)
+        layout.setSpacing(8)
 
         # Заголовок + Фильтр + кнопки
         header_row = QHBoxLayout()
+        header_row.setSpacing(6)
         title = QLabel("Журнал событий")
-        title.setStyleSheet(f"font-weight: bold; font-size: 14px; color: {'#f1f5f9' if is_dark else '#1e293b'};")
+        title.setStyleSheet(f"font-weight: bold; font-size: 14px; color: {'#f1f5f9' if is_dark else '#1e293b'}; border: none; background: transparent;")
         header_row.addWidget(title)
         header_row.addStretch()
 
@@ -195,34 +205,50 @@ class EventLogPanel(QWidget):
         for label, _ in self.STATUS_FILTER_OPTIONS:
             self._status_combo.addItem(label)
         self._status_combo.currentIndexChanged.connect(self.refresh)
-        self._status_combo.setMaximumWidth(120)
-        self._status_combo.setFixedHeight(28)
-        self._status_combo.setStyleSheet(f"""
-            QComboBox {{
-                border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
-                border-radius: 6px;
-                padding: 3px 10px;
-                background-color: {'#1e222b' if is_dark else '#ffffff'};
-                color: {'#f1f5f9' if is_dark else '#1e293b'};
-                font-size: 12px;
-                font-weight: 500;
-            }}
-        """)
+        self._status_combo.setMaximumWidth(110)
+        self._status_combo.setFixedHeight(26)
+        self._status_combo.setStyleSheet(get_combobox_style(self._theme))
         header_row.addWidget(self._status_combo)
 
-        btn_clear = QPushButton("🗑")
-        btn_clear.setFixedSize(26, 26)
-        btn_clear.setToolTip("Очистить журнал событий")
-        btn_clear.setStyleSheet("QPushButton { border: none; font-size: 14px; } QPushButton:hover { color: #ef4444; }")
-        btn_clear.clicked.connect(self.clear_history)
-        header_row.addWidget(btn_clear)
+        btn_style_clear = f"""
+            QPushButton {{
+                background-color: {'#1e222b' if is_dark else '#f8fafc'};
+                border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
+                border-radius: 5px;
+                padding: 3px;
+            }}
+            QPushButton:hover {{
+                background-color: {'#2a1619' if is_dark else '#fee2e2'};
+                border-color: #ef4444;
+            }}
+        """
+        self._btn_clear = QPushButton()
+        self._btn_clear.setIcon(UIComponents._get_qicon(get_svg_delete(self._theme), 14))
+        self._btn_clear.setFixedSize(26, 26)
+        self._btn_clear.setToolTip("Очистить журнал событий")
+        self._btn_clear.setStyleSheet(btn_style_clear)
+        self._btn_clear.clicked.connect(self.clear_history)
+        header_row.addWidget(self._btn_clear)
 
-        btn_refresh = QPushButton("↻")
-        btn_refresh.setFixedSize(26, 26)
-        btn_refresh.setToolTip("Обновить журнал")
-        btn_refresh.setStyleSheet("QPushButton { border: none; font-size: 15px; } QPushButton:hover { color: #3b82f6; }")
-        btn_refresh.clicked.connect(self.refresh)
-        header_row.addWidget(btn_refresh)
+        btn_style_refresh = f"""
+            QPushButton {{
+                background-color: {'#1e222b' if is_dark else '#f8fafc'};
+                border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
+                border-radius: 5px;
+                padding: 3px;
+            }}
+            QPushButton:hover {{
+                background-color: {'#172554' if is_dark else '#eff6ff'};
+                border-color: #3b82f6;
+            }}
+        """
+        self._btn_refresh = QPushButton()
+        self._btn_refresh.setIcon(UIComponents._get_qicon(get_svg_refresh(self._theme), 14))
+        self._btn_refresh.setFixedSize(26, 26)
+        self._btn_refresh.setToolTip("Обновить журнал")
+        self._btn_refresh.setStyleSheet(btn_style_refresh)
+        self._btn_refresh.clicked.connect(self.refresh)
+        header_row.addWidget(self._btn_refresh)
 
         layout.addLayout(header_row)
 
@@ -230,22 +256,22 @@ class EventLogPanel(QWidget):
         self._list = QListWidget()
         self._list.setSelectionMode(QAbstractItemView.NoSelection)
         self._list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self._list.setStyleSheet(f"""
-            QListWidget {{
+        self._list.setStyleSheet("""
+            QListWidget {
                 background-color: transparent;
                 border: none;
                 outline: none;
-            }}
-            QListWidget::item {{
+            }
+            QListWidget::item {
                 background-color: transparent;
                 border: none;
                 padding: 4px 0px;
-            }}
+            }
         """)
         layout.addWidget(self._list, 1)
 
         self._summary_label = QLabel("")
-        self._summary_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        self._summary_label.setStyleSheet("color: #94a3b8; font-size: 11px; border: none; background: transparent;")
         layout.addWidget(self._summary_label)
 
     def clear_history(self):
@@ -294,17 +320,27 @@ class EventLogPanel(QWidget):
         )
 
         self._list.clear()
-        for ev in events:
-            when_str = self._relative_time(ev["timestamp"])
-            full_time = _format_ts(ev["timestamp"])
-            host_name = ev.get("host_name") or ev.get("host_id", "")
-            status_code = ev.get("new_status", "")
-
-            item_widget = EventCardWidget(when_str, full_time, host_name, status_code, theme=self._theme)
+        if not events:
+            placeholder = QLabel("Событий пока нет")
+            placeholder.setAlignment(Qt.AlignCenter)
+            placeholder_color = "#94a3b8" if self._theme == "dark" else "#64748b"
+            placeholder.setStyleSheet(f"color: {placeholder_color}; font-size: 13px; padding: 40px 10px; border: none; background: transparent;")
             list_item = QListWidgetItem()
-            list_item.setSizeHint(item_widget.sizeHint())
+            list_item.setSizeHint(placeholder.sizeHint())
             self._list.addItem(list_item)
-            self._list.setItemWidget(list_item, item_widget)
+            self._list.setItemWidget(list_item, placeholder)
+        else:
+            for ev in events:
+                when_str = self._relative_time(ev["timestamp"])
+                full_time = _format_ts(ev["timestamp"])
+                host_name = ev.get("host_name") or ev.get("host_id", "")
+                status_code = ev.get("new_status", "")
+
+                item_widget = EventCardWidget(when_str, full_time, host_name, status_code, theme=self._theme)
+                list_item = QListWidgetItem()
+                list_item.setSizeHint(item_widget.sizeHint())
+                self._list.addItem(list_item)
+                self._list.setItemWidget(list_item, item_widget)
 
         count = len(events)
         suffix = " (последние 200)" if count >= 200 else ""
@@ -312,6 +348,44 @@ class EventLogPanel(QWidget):
 
     def set_theme(self, theme: str):
         self._theme = theme
+        is_dark = theme == "dark"
+        self.setStyleSheet(f"""
+            EventLogPanel {{
+                background-color: {'#181c26' if is_dark else '#ffffff'};
+                border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
+                border-radius: 8px;
+            }}
+        """)
+        if hasattr(self, '_btn_clear') and self._btn_clear:
+            self._btn_clear.setIcon(UIComponents._get_qicon(get_svg_delete(theme), 14))
+            self._btn_clear.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {'#1e222b' if is_dark else '#f8fafc'};
+                    border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
+                    border-radius: 5px;
+                    padding: 3px;
+                }}
+                QPushButton:hover {{
+                    background-color: {'#2a1619' if is_dark else '#fee2e2'};
+                    border-color: #ef4444;
+                }}
+            """)
+        if hasattr(self, '_btn_refresh') and self._btn_refresh:
+            self._btn_refresh.setIcon(UIComponents._get_qicon(get_svg_refresh(theme), 14))
+            self._btn_refresh.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {'#1e222b' if is_dark else '#f8fafc'};
+                    border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
+                    border-radius: 5px;
+                    padding: 3px;
+                }}
+                QPushButton:hover {{
+                    background-color: {'#172554' if is_dark else '#eff6ff'};
+                    border-color: #3b82f6;
+                }}
+            """)
+        if hasattr(self, '_status_combo') and self._status_combo:
+            self._status_combo.setStyleSheet(get_combobox_style(theme))
         self.refresh()
 
 
@@ -325,17 +399,20 @@ class HostHistoryDialog(QDialog):
     """
 
     EVENT_LABELS = {
-        "ONLINE":       ("🟢", "Online",              "#27ae60"),
-        "OFFLINE":      ("🔴", "Offline",             "#e74c3c"),
-        "WAITING":      ("🟠", "Ожидание",            "#e67e22"),
-        "MAINTENANCE":  ("🔵", "Тех.обслуживание",    "#8e44ad"),
+        "ONLINE":       ("●", "Online",              COLOR_ONLINE),
+        "OFFLINE":      ("●", "Offline",             COLOR_OFFLINE),
+        "WAITING":      ("●", "Ожидание",            COLOR_WAITING),
+        "MAINTENANCE":  ("●", "Тех.обслуживание",    COLOR_MAINTENANCE),
     }
 
     def __init__(self, parent, host, repository, theme: str = "light"):
         super().__init__(parent)
         self._host = host
         self._repository = repository
-        self._theme = theme
+        if parent and hasattr(parent, '_config'):
+            self._theme = getattr(parent._config, 'theme', theme)
+        else:
+            self._theme = theme
         self._events: List[Dict] = []
         self.setWindowTitle(f"История узла — {host.name}")
         self.resize(720, 540)
@@ -344,6 +421,9 @@ class HostHistoryDialog(QDialog):
         self.refresh()
 
     def _init_ui(self):
+        is_dark = self._theme == "dark"
+        self.setStyleSheet(get_main_style(self._theme))
+        set_dark_titlebar(self, is_dark)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
@@ -462,21 +542,25 @@ class HostHistoryDialog(QDialog):
 
         self._btn_export = QPushButton("📊 Экспорт в Excel")
         self._btn_export.setToolTip("Сохранить историю узла в Excel-файл")
+        self._btn_export.setStyleSheet(get_button_style(self._theme))
         self._btn_export.clicked.connect(self._export_to_excel)
         bottom_bar.addWidget(self._btn_export)
 
         self._btn_clear = QPushButton("🗑 Очистить историю")
         self._btn_clear.setToolTip("Удалить все события истории для этого узла")
+        self._btn_clear.setStyleSheet(get_button_style(self._theme))
         self._btn_clear.clicked.connect(self._clear_host_history)
         bottom_bar.addWidget(self._btn_clear)
 
         bottom_bar.addStretch()
 
         self._btn_refresh = QPushButton("↻ Обновить")
+        self._btn_refresh.setStyleSheet(get_button_style(self._theme))
         self._btn_refresh.clicked.connect(self.refresh)
         bottom_bar.addWidget(self._btn_refresh)
 
         self._btn_close = QPushButton("Закрыть")
+        self._btn_close.setStyleSheet(get_button_style(self._theme))
         self._btn_close.clicked.connect(self.close)
         bottom_bar.addWidget(self._btn_close)
 
@@ -545,16 +629,16 @@ class HostHistoryDialog(QDialog):
         # Обновляем плашки метрик
         self._val_incidents.setText(f"{offline_count} раз" if offline_count > 0 else "0 (стабилен)")
         if offline_count > 0:
-            self._val_incidents.setStyleSheet("font-size: 14px; font-weight: bold; color: #e74c3c; border: none;")
+            self._val_incidents.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLOR_OFFLINE}; border: none;")
         else:
-            self._val_incidents.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60; border: none;")
+            self._val_incidents.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLOR_ONLINE}; border: none;")
 
         if total_offline_seconds > 0:
             self._val_downtime.setText(_format_duration(total_offline_seconds))
-            self._val_downtime.setStyleSheet("font-size: 14px; font-weight: bold; color: #e67e22; border: none;")
+            self._val_downtime.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLOR_WAITING}; border: none;")
         else:
             self._val_downtime.setText("0 сек")
-            self._val_downtime.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60; border: none;")
+            self._val_downtime.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLOR_ONLINE}; border: none;")
 
         # Текущее состояние
         cur_st = self._host.status
@@ -564,10 +648,10 @@ class HostHistoryDialog(QDialog):
                 cur_dur = _format_duration(max(0, (now - latest_dt).total_seconds()))
                 if cur_st == "ONLINE":
                     self._val_uptime.setText(f"Online: {cur_dur}")
-                    self._val_uptime.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60; border: none;")
+                    self._val_uptime.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLOR_ONLINE}; border: none;")
                 elif cur_st == "OFFLINE":
                     self._val_uptime.setText(f"Offline: {cur_dur}")
-                    self._val_uptime.setStyleSheet("font-size: 14px; font-weight: bold; color: #e74c3c; border: none;")
+                    self._val_uptime.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLOR_OFFLINE}; border: none;")
                 else:
                     self._val_uptime.setText(f"{cur_st}: {cur_dur}")
             else:
@@ -632,10 +716,14 @@ class HistoryDialog(QDialog):
         ("Тех.обслуживание", "MAINTENANCE"),
     ]
 
-    def __init__(self, parent, repository, groups: List[str]):
+    def __init__(self, parent, repository, groups: List[str], theme: str = "light"):
         super().__init__(parent)
         self._repository = repository
         self._groups = groups
+        if parent and hasattr(parent, '_config'):
+            self._theme = getattr(parent._config, 'theme', theme)
+        else:
+            self._theme = theme
         self.setWindowTitle("Журнал событий")
         self.setModal(False)
         self.resize(900, 560)
@@ -643,6 +731,9 @@ class HistoryDialog(QDialog):
         self._refresh()
 
     def _init_ui(self):
+        is_dark = self._theme == "dark"
+        self.setStyleSheet(get_main_style(self._theme))
+        set_dark_titlebar(self, is_dark)
         layout = QVBoxLayout(self)
 
         # --- Панель фильтров ---
@@ -656,16 +747,19 @@ class HistoryDialog(QDialog):
         self._group_combo = QComboBox()
         self._group_combo.addItem("Все группы")
         self._group_combo.addItems(self._groups)
+        self._group_combo.setStyleSheet(get_combobox_style(self._theme))
         self._group_combo.currentIndexChanged.connect(self._refresh)
         filters_layout.addWidget(self._group_combo, 1)
 
         self._status_combo = QComboBox()
         for title, _code in self.STATUS_FILTER_OPTIONS:
             self._status_combo.addItem(title)
+        self._status_combo.setStyleSheet(get_combobox_style(self._theme))
         self._status_combo.currentIndexChanged.connect(self._refresh)
         filters_layout.addWidget(self._status_combo, 1)
 
         self._refresh_btn = QPushButton("Обновить")
+        self._refresh_btn.setStyleSheet(get_button_style(self._theme))
         self._refresh_btn.clicked.connect(self._refresh)
         filters_layout.addWidget(self._refresh_btn)
 
@@ -688,10 +782,11 @@ class HistoryDialog(QDialog):
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._table.setAlternatingRowColors(True)
         self._table.setSortingEnabled(False)  # сортируем сами при загрузке (по времени)
+        self._table.setStyleSheet(get_table_style(self._theme))
         layout.addWidget(self._table, 1)
 
         self._summary_label = QLabel("")
-        self._summary_label.setStyleSheet("color: #888;")
+        self._summary_label.setStyleSheet(f"color: {'#94a3b8' if is_dark else '#888'};")
         layout.addWidget(self._summary_label)
 
     def _schedule_refresh(self):

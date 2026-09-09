@@ -66,6 +66,7 @@ class UIComponents:
         # Настройка таблицы
         header = table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setSectionResizeMode(3, QHeaderView.Stretch)
         header.setSectionsMovable(True)
         header.setStretchLastSection(False)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -78,12 +79,12 @@ class UIComponents:
         header.setSortIndicatorShown(True)
         
         # Начальные ширины колонок
-        table.setColumnWidth(0, 70)  # Статус
-        table.setColumnWidth(1, 250) # Название
-        table.setColumnWidth(2, 130) # IP
-        table.setColumnWidth(3, 150) # Адрес
-        table.setColumnWidth(4, 120) # Группа
-        table.setColumnWidth(5, 120) # Время offline
+        table.setColumnWidth(0, 65)  # Статус
+        table.setColumnWidth(1, 260) # Название
+        table.setColumnWidth(2, 140) # IP
+        table.setColumnWidth(3, 160) # Адрес
+        table.setColumnWidth(4, 130) # Группа
+        table.setColumnWidth(5, 130) # Время offline
         table.setContextMenuPolicy(Qt.CustomContextMenu)
         
         # Стилизация
@@ -128,13 +129,13 @@ class UIComponents:
         
         # Фильтр по группам
         group_filter = QComboBox()
-        group_filter.addItem("📁 Все группы")
+        group_filter.addItem("Все группы")
         group_filter.addItems(groups)
         group_filter.setMinimumWidth(150)
         
         # Поле поиска
         search_edit = QLineEdit()
-        search_edit.setPlaceholderText("🔍 Поиск...")
+        search_edit.setPlaceholderText("Поиск...")
         search_edit.setMinimumWidth(250)
         search_edit.setClearButtonEnabled(True)
         
@@ -153,8 +154,8 @@ class UIComponents:
         b64_svg = base64.b64encode(svg_data.encode('utf-8')).decode('utf-8')
         img_tag = f"<img src='data:image/svg+xml;base64,{b64_svg}' width='36' height='36'>"
         
-        title_color = "#ffffff" if theme == "dark" else "#1e293b"
-        val_color = "#ffffff" if theme == "dark" else color
+        title_color = "#ffffff"
+        val_color = "#ffffff"
         
         label.setText(f"""
             <table width='100%' cellpadding='0' cellspacing='0'>

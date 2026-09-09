@@ -15,7 +15,7 @@ from models import Host, validate_ip_or_hostname
 from host_manager import HostManager
 from ui_components import UIComponents
 from constants import (
-    get_menu_style, SVG_MAINTENANCE, SVG_ONLINE, SVG_WAITING,
+    get_menu_style, SVG_MAINTENANCE, SVG_ONLINE, SVG_OFFLINE, SVG_WAITING,
     get_svg_add_group, get_svg_delete, get_svg_ping, get_svg_edit, get_svg_history
 )
 from core.host_repository import HostRepository
@@ -117,10 +117,10 @@ class ContextMenuManager:
         elif action == action_notify:
             HostManager.toggle_notifications(self._parent, row, self._table_model, self._repository)
         elif action_hd_set is not None and action == action_hd_set:
-            HelpdeskService.process_offline(host, self._parent._config)
+            HelpdeskService.process_offline([host.name], self._parent._config)
             QMessageBox.information(self._parent, "Helpdesk", "Процесс создания тикета (Установка статуса) запущен в фоне.")
         elif action_hd_remove is not None and action == action_hd_remove:
-            HelpdeskService.process_recovered(host, self._parent._config)
+            HelpdeskService.process_recovered([host.name], self._parent._config)
             QMessageBox.information(self._parent, "Helpdesk", "Процесс создания тикета (Снятие статуса) запущен в фоне.")
 
     @staticmethod

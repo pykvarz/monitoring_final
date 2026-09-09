@@ -14,7 +14,8 @@ from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtCore import Qt, QByteArray
 
 from models import Host, AppConfig, validate_ip_or_hostname
-from constants import get_svg_add_host, get_svg_settings
+from constants import get_svg_add_host, get_svg_settings, get_main_style, get_combobox_style
+from theme_manager import set_dark_titlebar
 
 
 class HostDialog(QDialog):
@@ -24,16 +25,15 @@ class HostDialog(QDialog):
         super().__init__(parent)
         self._host = host
         self._groups = groups or ["Без группы"]
+        self._theme = "dark"
+        if self.parent() and hasattr(self.parent(), '_config'):
+            self._theme = getattr(self.parent()._config, 'theme', 'dark')
         self._set_window_icon()
         self._init_ui()
 
     def _set_window_icon(self):
         """Установка иконки окна из SVG"""
-        # Определяем тему из родительского окна, если возможно
-        theme = "light"
-        if self.parent() and hasattr(self.parent(), '_config'):
-            theme = getattr(self.parent()._config, 'theme', 'light')
-            
+        theme = self._theme
         svg_data = get_svg_add_host(theme)
         renderer = QSvgRenderer(QByteArray(svg_data.encode('utf-8')))
         pixmap = QPixmap(32, 32)
@@ -47,6 +47,8 @@ class HostDialog(QDialog):
         self.setWindowTitle("Редактировать узел" if self._host else "Добавить узел")
         self.setModal(True)
         self.setMinimumWidth(500)
+        self.setStyleSheet(get_main_style(self._theme))
+        set_dark_titlebar(self, self._theme == "dark")
 
         layout = QVBoxLayout()
         form_layout = QFormLayout()
@@ -66,6 +68,7 @@ class HostDialog(QDialog):
         self._address_edit.setMaxLength(150)
 
         self._group_combo = QComboBox()
+        self._group_combo.setStyleSheet(get_combobox_style(self._theme))
         self._group_combo.setEditable(True)
         self._group_combo.lineEdit().setMaxLength(50) # Лимит на название группы
         self._group_combo.addItems(self._groups)
@@ -115,9 +118,9 @@ class HostDialog(QDialog):
         # Подсветка невалидных полей
         if self._ip_edit.text().strip():
             if not validate_ip_or_hostname(self._ip_edit.text().strip()):
-                self._ip_edit.setStyleSheet("border: 1px solid #dc3545;")
+                self._ip_edit.setStyleSheet("border: 1px solid #ef4444;")
             else:
-                self._ip_edit.setStyleSheet("border: 1px solid #28a745;")
+                self._ip_edit.setStyleSheet("border: 1px solid #10b981;")
         else:
             self._ip_edit.setStyleSheet("")
 
@@ -153,16 +156,13 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None, config: AppConfig = None):
         super().__init__(parent)
         self._config = config or AppConfig()
+        self._theme = getattr(self._config, 'theme', 'dark')
         self._set_window_icon()
         self._init_ui()
 
     def _set_window_icon(self):
         """Установка иконки окна из SVG"""
-        # Определяем тему из родительского окна, если возможно
-        theme = "light"
-        if self.parent() and hasattr(self.parent(), '_config'):
-            theme = getattr(self.parent()._config, 'theme', 'light')
-            
+        theme = self._theme
         svg_data = get_svg_settings(theme)
         renderer = QSvgRenderer(QByteArray(svg_data.encode('utf-8')))
         pixmap = QPixmap(32, 32)
@@ -176,6 +176,8 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Настройки")
         self.setModal(True)
         self.setMinimumWidth(500)
+        self.setStyleSheet(get_main_style(self._theme))
+        set_dark_titlebar(self, self._theme == "dark")
 
         layout = QVBoxLayout()
 

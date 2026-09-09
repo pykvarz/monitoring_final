@@ -12,7 +12,8 @@ from PyQt5.QtCore import Qt, QByteArray
 
 from constants import (
     get_svg_add_host, get_svg_add_group, get_svg_import, get_svg_export,
-    get_svg_scan, get_svg_pause, get_svg_settings, get_svg_theme, get_svg_delete
+    get_svg_scan, get_svg_pause, get_svg_settings, get_svg_theme, get_svg_delete,
+    get_menubar_style, get_menu_style
 )
 
 
@@ -47,9 +48,12 @@ class MenuBuilder:
             QMenuBar с полной структурой меню
         """
         menubar = parent.menuBar()
+        menubar.setStyleSheet(get_menubar_style(theme))
+        menu_style = get_menu_style(theme)
         
         # === Меню "Файл" ===
-        file_menu = menubar.addMenu("📁 Файл")
+        file_menu = menubar.addMenu("Файл")
+        file_menu.setStyleSheet(menu_style)
         
         action_import = QAction(MenuBuilder._get_qicon(get_svg_import(theme)), "Импорт из Excel", parent)
         action_import.setShortcut("Ctrl+I")
@@ -69,7 +73,8 @@ class MenuBuilder:
         file_menu.addAction(action_exit)
         
         # === Меню "Действия" ===
-        actions_menu = menubar.addMenu("⚡ Действия")
+        actions_menu = menubar.addMenu("Действия")
+        actions_menu.setStyleSheet(menu_style)
         
         action_add_host = QAction(MenuBuilder._get_qicon(get_svg_add_host(theme)), "Добавить узел", parent)
         action_add_host.setShortcut("Ctrl+N")
@@ -101,9 +106,10 @@ class MenuBuilder:
         actions_menu.addAction(action_pause)
         
         # === Меню "Вид" ===
-        view_menu = menubar.addMenu("👁 Вид")
+        view_menu = menubar.addMenu("Вид")
+        view_menu.setStyleSheet(menu_style)
         
-        action_history = QAction("📜 Журнал событий (падения/восстановления)", parent)
+        action_history = QAction(MenuBuilder._get_qicon(get_svg_scan(theme)), "Журнал событий (падения/восстановления)", parent)
         action_history.setShortcut("Ctrl+H")
         action_history.triggered.connect(parent._open_history_journal)
 
@@ -116,7 +122,8 @@ class MenuBuilder:
         view_menu.addAction(action_theme)
         
         # === Меню "Настройки" ===
-        settings_menu = menubar.addMenu("⚙ Настройки")
+        settings_menu = menubar.addMenu("Настройки")
+        settings_menu.setStyleSheet(menu_style)
         
         action_settings = QAction(MenuBuilder._get_qicon(get_svg_settings(theme)), "Параметры приложения", parent)
         action_settings.setShortcut("Ctrl+,")
@@ -125,7 +132,8 @@ class MenuBuilder:
         settings_menu.addAction(action_settings)
         
         # === Меню "Справка" ===
-        help_menu = menubar.addMenu("❓ Справка")
+        help_menu = menubar.addMenu("Справка")
+        help_menu.setStyleSheet(menu_style)
         
         action_about = QAction("О программе", parent)
         action_about.triggered.connect(lambda: parent._show_about_dialog())
@@ -143,10 +151,13 @@ class MenuBuilder:
             menubar: Объект QMenuBar для обновления
             theme: Новая тема ('light' или 'dark')
         """
+        menubar.setStyleSheet(get_menubar_style(theme))
+        menu_style = get_menu_style(theme)
         # Получаем все действия из всех меню
         for action in menubar.actions():
             menu = action.menu()
             if menu:
+                menu.setStyleSheet(menu_style)
                 for menu_action in menu.actions():
                     text = menu_action.text()
                     

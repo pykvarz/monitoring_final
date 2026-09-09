@@ -11,15 +11,10 @@ except ImportError:
     ping = None
 
 try:
-    from plyer import notification
-    # Explicit import to force PyInstaller to bundle the Windows implementation
-    import sys
-    if sys.platform == 'win32':
-        import plyer.platforms.win.notification
+    from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QStyle
 except ImportError:
-    notification = None
+    pass
 
-from PyQt5.QtWidgets import QApplication
 from typing import List, Union, Optional
 
 from models import AppConfig
@@ -27,12 +22,24 @@ from interfaces import INotificationService, IPingService
 
 
 class NotificationService(INotificationService):
-    """Сервис отправки уведомлений (реализация через plyer)"""
+    """Сервис отправки уведомлений (реализация через QSystemTrayIcon)"""
+    
+    _tray_icon = None
+
+    @classmethod
+    def _get_tray_icon(cls) -> Optional['QSystemTrayIcon']:
+        if cls._tray_icon is None:
+            app = QApplication.instance()
+            if app and QSystemTrayIcon.isSystemTrayAvailable():
+                cls._tray_icon = QSystemTrayIcon(app)
+                cls._tray_icon.setIcon(app.style().standardIcon(QStyle.SP_ComputerIcon))
+                cls._tray_icon.show()
+        return cls._tray_icon
 
     @staticmethod
     def notify_offline_hosts(hosts: List[str], config: AppConfig) -> None:
         """Отправка уведомлений об упавших узлах"""
-        if not hosts or not config.notifications_enabled or not notification:
+        if not hosts or not config.notifications_enabled:
             return
 
         if len(hosts) <= 3:
@@ -46,21 +53,17 @@ class NotificationService(INotificationService):
             if config.sound_enabled:
                 QApplication.beep()
 
-            # Уведомление в трее
-            notification.notify(
-                title=title,
-                message=message,
-                app_name="Network Monitor",
-                timeout=5
-            )
+            tray = NotificationService._get_tray_icon()
+            if tray:
+                tray.showMessage(title, message, QSystemTrayIcon.Warning, 5000)
 
-        except (ImportError, RuntimeError, OSError) as e:
+        except Exception as e:
             logging.error(f"Ошибка отправки уведомления: {e}", exc_info=True)
 
     @staticmethod
     def notify_recovered_hosts(hosts: List[str], config: AppConfig) -> None:
         """Отправка уведомлений о восстановившихся узлах"""
-        if not hosts or not config.notifications_enabled or not notification:
+        if not hosts or not config.notifications_enabled:
             return
 
         if len(hosts) <= 3:
@@ -74,30 +77,21 @@ class NotificationService(INotificationService):
             if config.sound_enabled:
                 QApplication.beep()
 
-            notification.notify(
-                title=title,
-                message=message,
-                app_name="Network Monitor",
-                timeout=5
-            )
+            tray = NotificationService._get_tray_icon()
+            if tray:
+                tray.showMessage(title, message, QSystemTrayIcon.Information, 5000)
 
-        except (ImportError, RuntimeError, OSError) as e:
+        except Exception as e:
             logging.error(f"Ошибка отправки уведомления: {e}", exc_info=True)
     
     @staticmethod
     def show_notification(title: str, message: str) -> None:
         """Показ системного уведомления"""
-        if not notification:
-            return
-        
         try:
-            notification.notify(
-                title=title,
-                message=message,
-                app_name="Network Monitor",
-                timeout=5
-            )
-        except (ImportError, RuntimeError, OSError) as e:
+            tray = NotificationService._get_tray_icon()
+            if tray:
+                tray.showMessage(title, message, QSystemTrayIcon.Information, 5000)
+        except Exception as e:
             logging.error(f"Ошибка показа уведомления: {e}", exc_info=True)
 
 
@@ -105,19 +99,24 @@ class PingService(IPingService):
     """Сервис для выполнения ping-запросов (реализация через ping3)"""
 
     @staticmethod
-    def ping_host(ip: str, timeout: float = 2.0) -> Optional[bool]:
-        """Выполнение ping-запроса с фоллбэком на системный ping"""
-        # 1. Попытка через ping3 (быстро, но требует прав)
-        if ping:
-            try:
-                res = ping(ip, timeout=timeout)
-                if isinstance(res, float):
-                    return True
-            except (OSError, ValueError, RuntimeError, PermissionError) as e:
-                logging.warning(f"Ошибка ping3 {ip}: {e}")
-        
-        # 2. Фоллбэк на системный ping (работает всегда)
-        return PingService._system_ping(ip, timeout)
+    def ping_host(ip: str, timeout: float = 2.0, retries: int = 3) -> Optional[bool]:
+        """Выполнение ping-запроса с фоллбэком на системный ping (с повторами при неудаче)"""
+        for attempt in range(retries):
+            # 1. Попытка через ping3 (быстро, но требует прав)
+            if ping:
+                try:
+                    res = ping(ip, timeout=timeout)
+                    if isinstance(res, float):
+                        return True
+                except (OSError, ValueError, RuntimeError, PermissionError) as e:
+                    if attempt == 0:  # Логируем ошибку только при первой попытке
+                        logging.warning(f"Ошибка ping3 {ip}: {e} (будет использован системный ping)")
+            
+            # 2. Фоллбэк на системный ping (работает всегда)
+            if PingService._system_ping(ip, timeout):
+                return True
+                
+        return False
 
     @staticmethod
     def _system_ping(host: str, timeout: float = 2.0) -> bool:

@@ -164,7 +164,7 @@ class AppConfig:
     column_widths: Dict[str, int] = field(default_factory=dict)
     column_order: List[int] = field(default_factory=list)
     hidden_columns: List[int] = field(default_factory=list)
-    theme: str = "light"  # 'light' или 'dark'
+    theme: str = "dark"
     custom_groups: List[str] = field(default_factory=list)
     history_retention_days: int = 90  # 0 = хранить бессрочно
     splitter_sizes: List[int] = field(default_factory=list)

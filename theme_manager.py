@@ -4,9 +4,11 @@
 ThemeManager - Управление темами оформления приложения
 """
 
+import sys
+import ctypes
 from typing import Callable
-from PyQt5.QtWidgets import QMainWindow, QPushButton, QHBoxLayout, QLabel, QTableView
-from PyQt5.QtGui import QIcon, QPixmap, QPainter
+from PyQt5.QtWidgets import QMainWindow, QPushButton, QHBoxLayout, QLabel, QTableView, QApplication
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QPalette, QColor
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtCore import QByteArray, Qt
 from models import AppConfig, HostStatus
@@ -14,15 +16,50 @@ from storage import StorageManager
 from table_model import HostTableModel
 from constants import (
     get_main_style, get_table_style, get_dashboard_style,
-    get_button_style, get_stat_card_style,
+    get_button_style, get_stat_card_style, get_combobox_style,
     get_svg_total, get_svg_add_host, get_svg_add_group,
     get_svg_import, get_svg_export, get_svg_scan, get_svg_bulk,
-    get_svg_theme, get_svg_settings, get_svg_delete, get_svg_history,
+    get_svg_settings, get_svg_delete, get_svg_history,
     get_svg_pause, get_svg_play,
     COLOR_TOTAL
 )
 from ui_components import UIComponents
-from menu_builder import MenuBuilder
+
+
+def set_dark_titlebar(widget, dark: bool = True) -> None:
+    """Установка темной темы на системный заголовок окна Windows (10/11)"""
+    if sys.platform != "win32":
+        return
+    try:
+        hwnd = int(widget.winId())
+        set_window_attribute = ctypes.windll.dwmapi.DwmSetWindowAttribute
+        val = ctypes.c_int(1 if dark else 0)
+        # 20 = DWMWA_USE_IMMERSIVE_DARK_MODE (Win11 / Win10 20H1+), 19 = старые версии Win10
+        if set_window_attribute(hwnd, 20, ctypes.byref(val), ctypes.sizeof(val)) != 0:
+            set_window_attribute(hwnd, 19, ctypes.byref(val), ctypes.sizeof(val))
+    except Exception:
+        pass
+
+
+def apply_app_palette(theme: str = "dark") -> None:
+    """Глобальная системная палитра для корректной отрисовки выпадающих списков и меню"""
+    app = QApplication.instance()
+    if not app:
+        return
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor("#151820"))
+    palette.setColor(QPalette.WindowText, QColor("#f1f5f9"))
+    palette.setColor(QPalette.Base, QColor("#181c26"))
+    palette.setColor(QPalette.AlternateBase, QColor("#1e222e"))
+    palette.setColor(QPalette.ToolTipBase, QColor("#1c202a"))
+    palette.setColor(QPalette.ToolTipText, QColor("#f1f5f9"))
+    palette.setColor(QPalette.Text, QColor("#f1f5f9"))
+    palette.setColor(QPalette.Button, QColor("#1c202a"))
+    palette.setColor(QPalette.ButtonText, QColor("#f1f5f9"))
+    palette.setColor(QPalette.BrightText, QColor("#ffffff"))
+    palette.setColor(QPalette.Highlight, QColor("#2563eb"))
+    palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
+    app.setPalette(palette)
 
 
 class ThemeManager:
@@ -74,35 +111,16 @@ class ThemeManager:
 
     def get_current_theme(self) -> str:
         """Получение текущей темы"""
-        return getattr(self._config, 'theme', 'light')
+        return "dark"
 
-    def toggle_theme(self) -> None:
-        """Переключение между светлой и темной темой"""
-        current_theme = self.get_current_theme()
-        new_theme = 'dark' if current_theme == 'light' else 'light'
-        
-        # Сохраняем новую тему
-        self._config.theme = new_theme
-        self._storage.save_config(self._config)
-        
-        # Применяем стили
-        self._apply_theme(new_theme)
-        
-        # Показываем уведомление
-        self._window.statusBar().showMessage(
-            f"Тема изменена на {'темную' if new_theme == 'dark' else 'светлую'}", 
-            3000
-        )
 
-    def _apply_theme(self, theme: str) -> None:
-        """
-        Применение темы ко всем компонентам
+
+    def _apply_theme(self, theme: str = "dark") -> None:
+        """Применение тёмной темы ко всем компонентам"""
         
-        Args:
-            theme: Название темы ('light' или 'dark')
-        """
-        is_dark = theme == "dark"
-        
+        apply_app_palette()
+        set_dark_titlebar(self._window, True)
+
         # Основные стили окна
         self._window.setStyleSheet(get_main_style(theme))
         
@@ -122,25 +140,22 @@ class ThemeManager:
         if self._dashboard_labels:
             self._update_dashboard_cards(theme)
         
-        # Обновляем иконки меню
-        MenuBuilder.update_menu_icons(self._window.menuBar(), theme)
-        
         # Обновляем кнопки тулбара быстрых действий
-        btn_style = f"""
-            QPushButton {{
-                background-color: {'#1c202a' if is_dark else '#ffffff'};
-                border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
+        btn_style = """
+            QPushButton {
+                background-color: #1c202a;
+                border: 1px solid #282e3d;
                 border-radius: 6px;
                 padding: 4px;
                 min-width: 28px;
                 max-width: 28px;
                 min-height: 28px;
                 max-height: 28px;
-            }}
-            QPushButton:hover {{
-                background-color: {'#252b38' if is_dark else '#f1f5f9'};
+            }
+            QPushButton:hover {
+                background-color: #252b38;
                 border-color: #3b82f6;
-            }}
+            }
         """
         for attr, svg_fn in [
             ('_btn_add_host', get_svg_add_host),
@@ -150,6 +165,7 @@ class ThemeManager:
             ('_btn_scan', get_svg_scan),
             ('_btn_pause', lambda t: get_svg_play(t) if (getattr(self._window, '_monitor_thread', None) and self._window._monitor_thread.is_paused()) else get_svg_pause(t)),
             ('_btn_settings', get_svg_settings),
+            ('_btn_import', get_svg_import),
             ('_btn_export', get_svg_export),
         ]:
             btn = getattr(self._window, attr, None)
@@ -157,29 +173,23 @@ class ThemeManager:
                 btn.setStyleSheet(btn_style)
                 btn.setIcon(UIComponents._get_qicon(svg_fn(theme)))
 
+        if hasattr(self._window, '_tb_separators') and self._window._tb_separators:
+            for sep in self._window._tb_separators:
+                sep.setStyleSheet("color: #282e3d; max-height: 20px; margin: 4px 4px;")
+
         if hasattr(self._window, '_group_filter') and self._window._group_filter:
-            self._window._group_filter.setStyleSheet(f"""
-                QComboBox {{
-                    border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
-                    border-radius: 6px;
-                    padding: 3px 10px;
-                    background-color: {'#1c202a' if is_dark else '#ffffff'};
-                    color: {'#f1f5f9' if is_dark else '#1e293b'};
-                    font-size: 12px;
-                    min-width: 140px;
-                }}
-            """)
+            self._window._group_filter.setStyleSheet(get_combobox_style())
         if hasattr(self._window, '_search_edit') and self._window._search_edit:
-            self._window._search_edit.setStyleSheet(f"""
-                QLineEdit {{
-                    border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
+            self._window._search_edit.setStyleSheet("""
+                QLineEdit {
+                    border: 1px solid #282e3d;
                     border-radius: 6px;
                     padding: 3px 10px;
-                    background-color: {'#1c202a' if is_dark else '#ffffff'};
-                    color: {'#f1f5f9' if is_dark else '#1e293b'};
+                    background-color: #1c202a;
+                    color: #f1f5f9;
                     font-size: 12px;
                     min-width: 180px;
-                }}
+                }
             """)
 
         # Обновляем иконку окна
@@ -230,7 +240,7 @@ class ThemeManager:
                 if "сбросить" in btn.text().lower():
                     btn.setIcon(UIComponents._get_qicon(get_svg_delete(theme)))
 
-    def set_window_icon(self, theme: str = "light") -> None:
+    def set_window_icon(self, theme: str = "dark") -> None:
         """
         Установка иконки главного окна
         

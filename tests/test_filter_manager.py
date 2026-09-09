@@ -46,7 +46,7 @@ class TestFilterManager(unittest.TestCase):
         self.table.setModel(self.table_model)
         
         # Initialize filters
-        self.group_filter.addItem("📁 Все группы")
+        self.group_filter.addItem("Все группы")
         self.group_filter.addItems(["Group1", "Group2", "Group3"])
         
         self.status_filter.addItem("📊 Все статусы")

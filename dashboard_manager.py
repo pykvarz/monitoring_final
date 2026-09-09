@@ -95,8 +95,8 @@ class DashboardManager:
 
     def _refresh_ui(self) -> None:
         """Фактическое обновление UI Dashboard с использованием SVG и учетом темы"""
-        theme = getattr(self._config, 'theme', 'light')
-        title_color = "#ffffff" if theme == "dark" else "#1e293b"
+        theme = getattr(self._config, 'theme', 'dark')
+        title_color = "#ffffff"
         
         # Используем значение TOTAL из словаря или считаем сумму (исключая сам ключ TOTAL если он есть)
         if "TOTAL" in self._stats_counts:

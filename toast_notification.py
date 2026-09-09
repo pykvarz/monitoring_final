@@ -91,30 +91,17 @@ class ToastNotification(QFrame):
 
         cfg = type_colors.get(self._toast_type, type_colors[ToastType.INFO])
 
-        if is_dark:
-            cfg.update({
-                "bg": "#181d27",
-                "border": "#2c3445",
-                "title_color": "#f8fafc",
-                "text_color": "#cbd5e1",
-                "muted_color": "#94a3b8",
-                "tag_bg": "#222938",
-                "tag_border": "#333e54",
-                "tag_color": "#f1f5f9",
-                "shadow": QColor(0, 0, 0, 140),
-            })
-        else:
-            cfg.update({
-                "bg": "#ffffff",
-                "border": "#e2e8f0",
-                "title_color": "#0f172a",
-                "text_color": "#334155",
-                "muted_color": "#64748b",
-                "tag_bg": "#f1f5f9",
-                "tag_border": "#cbd5e1",
-                "tag_color": "#1e293b",
-                "shadow": QColor(0, 0, 0, 35),
-            })
+        cfg.update({
+            "bg": "#181d27",
+            "border": "#2c3445",
+            "title_color": "#f8fafc",
+            "text_color": "#cbd5e1",
+            "muted_color": "#94a3b8",
+            "tag_bg": "#222938",
+            "tag_border": "#333e54",
+            "tag_color": "#f1f5f9",
+            "shadow": QColor(0, 0, 0, 140),
+        })
 
         return cfg
 

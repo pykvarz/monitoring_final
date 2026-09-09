@@ -184,9 +184,11 @@ class DataManager(QObject):
             old_status = lookup.value("status")
             host_name = lookup.value("name") or host_id
 
-        # Узел в статусе ONLINE никогда не может иметь offline_since — всегда сбрасываем в None
-        if status == "ONLINE":
-            offline_since = None
+        # Примечание: offline_since НЕ обнуляется принудительно при status=ONLINE.
+        # Статус-машина (MonitorThread._calculate_status) осознанно передаёт
+        # offline_since при первом неудачном пинге, даже если status ещё ONLINE
+        # (порог waiting_timeout не достигнут). При реальном восстановлении
+        # (ping OK) статус-машина сама передаёт offline_since=None.
 
         query = QSqlQuery()
         
@@ -432,8 +434,12 @@ class DataManager(QObject):
         """Helper: QSqlQuery record -> Host object"""
         st = query.value("status")
         raw_os = query.value("offline_since")
-        # Если статус ONLINE или колонка пустая — offline_since строго None
-        offline_since = (raw_os if raw_os else None) if st != "ONLINE" else None
+        # Читаем offline_since как есть из БД. Очистка offline_since при
+        # переходе в ONLINE — ответственность статус-машины (update_host_status),
+        # а не слоя чтения. Принудительный сброс здесь ломал статус-машину:
+        # MonitorThread не мог отследить длительность простоя, потому что
+        # каждый цикл чтения обнулял таймер для ONLINE-хостов.
+        offline_since = raw_os if raw_os else None
 
         return Host(
             id=query.value("id"),
@@ -442,6 +448,7 @@ class DataManager(QObject):
             address=query.value("address") or "",
             group=query.value("grp"),
             status=st,
+            last_seen=query.value("last_seen") or None,
             offline_since=offline_since,
             notifications_enabled=bool(query.value("notifications_enabled"))
         )

@@ -330,7 +330,7 @@ class MonitorThread(QThread):
                         if host.status != "OFFLINE":
                             new_status = "OFFLINE"
                             should_update = True
-                    elif duration >= self._config.waiting_timeout:
+                    else:
                         if host.status != "WAITING":
                             new_status = "WAITING"
                             should_update = True
