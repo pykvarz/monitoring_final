@@ -147,6 +147,24 @@ class TestDatabaseManager(unittest.TestCase):
         db = self.db_manager.get_db()
         self.assertFalse(db.isOpen())
 
+    def test_schema_version_and_migrations(self):
+        """Test that schema_version table exists and migration v1 is recorded."""
+        self.db_manager = DatabaseManager(":memory:")
+        db = self.db_manager.get_db()
+
+        query = QSqlQuery(db)
+        self.assertTrue(query.exec_("SELECT MAX(version) FROM schema_version"))
+        self.assertTrue(query.next())
+        self.assertEqual(query.value(0), 1)
+
+        # Check that address column exists in hosts
+        query2 = QSqlQuery(db)
+        self.assertTrue(query2.exec_("PRAGMA table_info(hosts)"))
+        columns = []
+        while query2.next():
+            columns.append(query2.value(1))
+        self.assertIn("address", columns)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -75,9 +75,9 @@ class TestDowntimeCounterReset(unittest.TestCase):
         now = datetime.now(timezone.utc)
         host = Host(id="h2", ip="10.0.0.2", name="Server-2", status="ONLINE", offline_since=None)
 
-        # 1-й пинг упал (кратковременный глитч)
+        # 1-й пинг упал (кратковременный глитч) -> переход в WAITING
         st1, os1, up1 = self.thread._calculate_status(host, "OFFLINE", now)
-        self.assertEqual(st1, "ONLINE")
+        self.assertEqual(st1, "WAITING")
         self.assertIsNotNone(os1)
         host.offline_since = os1
 

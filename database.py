@@ -17,6 +17,7 @@ class DatabaseManager:
         self._init_connection()
         self._optimize_db()
         self._create_tables()
+        self._run_migrations()
 
     def _init_connection(self):
         """Инициализация соединения с БД"""
@@ -88,10 +89,6 @@ class DatabaseManager:
         query.exec_("CREATE INDEX IF NOT EXISTS idx_hosts_status ON hosts(status)")
         query.exec_("CREATE INDEX IF NOT EXISTS idx_hosts_grp ON hosts(grp)")
 
-        # Миграция: добавляем колонку address если её нет (для существующих БД)
-        query.exec_("ALTER TABLE hosts ADD COLUMN address TEXT DEFAULT ''")
-        # Ошибка игнорируется — если колонка уже есть, ALTER TABLE вернёт ошибку, это нормально
-
         # Таблица настроек (Key-Value хранилище)
         settings_table = """
         CREATE TABLE IF NOT EXISTS settings (
@@ -121,6 +118,67 @@ class DatabaseManager:
         query.exec_("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON status_history(timestamp)")
 
         logging.info("Структура таблиц проверена/создана")
+
+    def _run_migrations(self):
+        """Применение версионированных миграций схемы БД"""
+        if not self._connected:
+            return
+
+        query = QSqlQuery()
+        schema_table = """
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        if not query.exec_(schema_table):
+            logging.error(f"Ошибка создания таблицы schema_version: {query.lastError().text()}")
+            return
+
+        current_version = 0
+        if query.exec_("SELECT MAX(version) FROM schema_version") and query.next():
+            val = query.value(0)
+            if val is not None and str(val) != "":
+                try:
+                    current_version = int(val)
+                except (ValueError, TypeError):
+                    current_version = 0
+
+        migrations = [
+            (1, self._migration_add_address_column),
+        ]
+
+        for ver, migration_fn in migrations:
+            if current_version < ver:
+                logging.info(f"Применение миграции БД v{ver}...")
+                try:
+                    if migration_fn():
+                        record_query = QSqlQuery()
+                        record_query.prepare("INSERT INTO schema_version (version) VALUES (:version)")
+                        record_query.bindValue(":version", ver)
+                        if not record_query.exec_():
+                            logging.error(f"Не удалось зафиксировать версию миграции v{ver}: {record_query.lastError().text()}")
+                            break
+                        logging.info(f"Миграция БД v{ver} успешно применена")
+                    else:
+                        logging.error(f"Миграция v{ver} завершилась неудачей")
+                        break
+                except Exception as e:
+                    logging.error(f"Исключение при выполнении миграции v{ver}: {e}")
+                    break
+
+    def _migration_add_address_column(self) -> bool:
+        """Миграция v1: Добавление колонки address в таблицу hosts, если её нет"""
+        query = QSqlQuery()
+        query.exec_("PRAGMA table_info(hosts)")
+        cols = []
+        while query.next():
+            cols.append(query.value(1))
+        if "address" not in cols:
+            if not query.exec_("ALTER TABLE hosts ADD COLUMN address TEXT DEFAULT ''"):
+                logging.error(f"Ошибка добавления колонки address: {query.lastError().text()}")
+                return False
+        return True
 
     def get_db(self) -> QSqlDatabase:
         return self.db

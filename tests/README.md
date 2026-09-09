@@ -59,7 +59,6 @@ python -m unittest tests.test_models.TestHostModel.test_valid_ip
 
 ### UI Components
 - ✅ `test_toolbar_builder.py` - Toolbar creation
-- ✅ `test_menu_builder.py` - Menu creation
 - ✅ `test_table_settings_manager.py` - Column settings
 
 ### Subscribers

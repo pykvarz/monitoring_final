@@ -206,7 +206,7 @@ class DataManager(QObject):
 
         query.prepare(sql)
         query.bindValue(":status", status)
-        query.bindValue(":last_seen", datetime.now().isoformat())
+        query.bindValue(":last_seen", datetime.now(timezone.utc).isoformat())
         query.bindValue(":offline_since", offline_since if offline_since else None)
         query.bindValue(":id", host_id)
         

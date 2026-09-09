@@ -8,15 +8,17 @@ Network Monitor - Система мониторинга доступности �
 
 import sys
 import logging
+from logging.handlers import RotatingFileHandler
 import traceback
 
-# Настройка логирования для отладки вылетов
+# Настройка логирования: INFO по умолчанию, DEBUG при запуске с флагом --debug
+log_level = logging.DEBUG if "--debug" in sys.argv else logging.INFO
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=log_level,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('debug.log', mode='w', encoding='utf-8')
+        RotatingFileHandler('debug.log', maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8')
     ]
 )
 

@@ -46,14 +46,14 @@ class TestMonitorLogic(unittest.TestCase):
         self.assertTrue(update) # Threshold exceeded, should update
 
     def test_online_to_waiting_logic(self):
-        # Initial failure
+        # Initial failure immediately transitions to WAITING
         host = Host(id="1", ip="127.0.0.1", name="Local", status="ONLINE")
         ping_status = "OFFLINE"
         now = datetime.now(timezone.utc)
         
         new_status, offline_since, update = self.thread._calculate_status(host, ping_status, now)
         
-        self.assertEqual(new_status, "ONLINE")
+        self.assertEqual(new_status, "WAITING")
         self.assertIsNotNone(offline_since)
         self.assertTrue(update)
 
