@@ -45,10 +45,14 @@ class HelpdeskService:
             from playwright.sync_api import sync_playwright
             with sync_playwright() as p:
                 logging.info(f"Запуск Playwright для {host_name} ({status_action})")
-                # Для SSO NTLM/Kerberos часто нужен auth-server-allowlist="*"
+                import urllib.parse
+                domain = urllib.parse.urlparse(url).netloc
+                if ":" in domain:
+                    domain = domain.split(":")[0]
+                
                 browser = p.chromium.launch(
                     headless=True,
-                    args=['--auth-server-allowlist="helpdesk.eub.kz"']
+                    args=[f'--auth-server-allowlist="{domain}"']
                 )
                 context = browser.new_context()
                 page = context.new_page()

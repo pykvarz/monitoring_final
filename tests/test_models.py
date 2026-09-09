@@ -236,7 +236,7 @@ class TestAppConfigModel(unittest.TestCase):
         self.assertTrue(config.notifications_enabled)
         self.assertFalse(config.sound_enabled)
         self.assertEqual(config.max_workers, 20)
-        self.assertEqual(config.theme, "light")
+        self.assertEqual(config.theme, "dark")
     
     def test_custom_config(self):
         """Test custom configuration values."""

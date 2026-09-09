@@ -392,8 +392,7 @@ class MainWindow(QMainWindow):
         
         self._theme_manager.set_window_icon(self._theme_manager.get_current_theme())
 
-        # Автоматическая очистка устаревшей истории по настройке срока хранения
-        self._repository.purge_old_history(self._config.history_retention_days)
+
 
     def _init_monitor_thread(self) -> None:
         """Инициализация потока мониторинга с Repository"""

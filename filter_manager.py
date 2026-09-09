@@ -173,12 +173,12 @@ class FilterManager:
 
     def get_current_search_text(self) -> str:
         """Получение текущего поискового запроса"""
-        return self._search_edit.text()
+        return self._search_edit.text() if self._search_edit else ""
 
     def get_current_group_filter(self) -> str:
         """Получение текущего фильтра по группе"""
-        return self._group_filter.currentText().replace("📁 ", "")
+        return self._group_filter.currentText().replace("📁 ", "") if self._group_filter else "Все группы"
 
     def get_current_status_filter(self) -> str:
         """Получение текущего фильтра по статусу"""
-        return self._status_filter.currentText()
+        return self._status_filter.currentText() if self._status_filter else "Все статусы"
