@@ -213,6 +213,30 @@ class TestExcelService(unittest.TestCase):
         status_value = sheet.cell(row=2, column=status_col).value
         self.assertEqual(status_value, "Offline")
 
+    def test_export_hosts_formula_injection(self):
+        """Test that potentially dangerous formula characters are escaped with an apostrophe."""
+        host = Host(
+            name="=cmd|' /C calc'!A0",
+            ip="192.168.1.10",
+            address="+123456789",
+            group="-AdminGroup",
+            notifications_enabled=True
+        )
+        filepath = os.path.join(self.temp_dir, "formula_test.xlsx")
+        ExcelService.export_hosts(filepath, [host])
+
+        workbook = openpyxl.load_workbook(filepath)
+        sheet = workbook.active
+
+        name_val = sheet.cell(row=2, column=1).value
+        addr_val = sheet.cell(row=2, column=3).value
+        group_val = sheet.cell(row=2, column=4).value
+
+        self.assertEqual(name_val, "'=cmd|' /C calc'!A0")
+        self.assertEqual(addr_val, "'+123456789")
+        self.assertEqual(group_val, "'-AdminGroup")
+
 
 if __name__ == '__main__':
     unittest.main()
+

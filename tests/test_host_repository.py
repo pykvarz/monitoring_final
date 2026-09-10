@@ -102,5 +102,20 @@ class TestHostRepository(unittest.TestCase):
         hosts = self.repository.get_all()
         self.assertEqual(len(hosts), 0)
 
+    def test_exists_by_ip(self):
+        host = Host(id="1", ip="192.168.1.100", name="Host1")
+        self.repository.add(host)
+
+        # Should find existing IP
+        self.assertTrue(self.repository.exists_by_ip("192.168.1.100"))
+        # Non-existent IP
+        self.assertFalse(self.repository.exists_by_ip("192.168.1.200"))
+        # Exclude self ID (useful for edit)
+        self.assertFalse(self.repository.exists_by_ip("192.168.1.100", exclude_id="1"))
+        # Exclude another ID should still report exists
+        self.assertTrue(self.repository.exists_by_ip("192.168.1.100", exclude_id="2"))
+
+
 if __name__ == '__main__':
     unittest.main()
+

@@ -26,6 +26,10 @@ class HostManager:
                 QMessageBox.warning(parent, "Ошибка", "Некорректные данные узла")
                 return False
             
+            if repository.exists_by_ip(new_host.ip):
+                QMessageBox.warning(parent, "Ошибка", f"Узел с адресом/IP '{new_host.ip}' уже существует")
+                return False
+
             if repository.add(new_host):
                 return True
             else:
@@ -86,6 +90,14 @@ class HostManager:
             # ID не меняется
             edited_host.id = host.id 
             
+            if not edited_host.validate():
+                QMessageBox.warning(parent, "Ошибка", "Некорректные данные узла")
+                return
+
+            if repository.exists_by_ip(edited_host.ip, exclude_id=host.id):
+                QMessageBox.warning(parent, "Ошибка", f"Узел с адресом/IP '{edited_host.ip}' уже существует")
+                return
+
             if not repository.update(edited_host):
                 QMessageBox.warning(parent, "Ошибка", "Не удалось сохранить изменения")
 

@@ -57,6 +57,10 @@ class HostRepository(QObject):
         # SQL-фильтрация на стороне БД через DataManager
         return self._data_manager.get_hosts_by_group(group)
 
+    def exists_by_ip(self, ip: str, exclude_id: Optional[str] = None) -> bool:
+        """Проверка существования хоста с данным IP (или хостнеймом)"""
+        return self._data_manager.exists_by_ip(ip, exclude_id)
+
     def get_stats(self) -> Dict[str, int]:
         return self._data_manager.get_stats()
     
