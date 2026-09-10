@@ -36,8 +36,24 @@
 - **Цвет выделения (Selection)**: `#e3f2fd`
 - **Чередование строк таблицы (Zebra Row)**: `#f8f9fa`
 
+#### Tactical Theme (NOC Terminal)
+- **Фон окна (Background)**: `#090A0F`
+- **Фон карточек/панелей (Surface)**: `#0D1117`
+- **Границы (Borders)**: `#1F232D`
+- **Текст основной (Primary Text)**: `#E2E8F0`
+- **Текст вторичный (Secondary Text)**: `#64748B`
+- **Цвет выделения (Selection)**: `#1F2937`
+- **Акценты статусов в Tactical**:
+  - `ONLINE`: `#39FF14` (Неоновый зеленый)
+  - `WAITING`: `#FBBF24` (Янтарный)
+  - `OFFLINE`: `#EF4444` (Красный)
+  - `MAINTENANCE`: `#A855F7` (Фиолетовый)
+  - `TOTAL`: `#00F0FF` (Неоновый циан)
+
 ### 1.3. Типографика (Typography)
-- **Семейство**: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif`
+- **Семейство**:
+  - Dark / Light: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif`
+  - Tactical: `Consolas, "Courier New", monospace`
 - **Размеры**:
   - Заголовки разделов / модальных окон: 14–16px, полужирный (bold / 600)
   - Значения метрик в карточках: 24–26px, сверхжирный (black / 900)

@@ -1,4 +1,4 @@
-﻿# Tech Context — Network Monitor
+# Tech Context — Network Monitor
 
 ## Стек технологий
 
@@ -7,8 +7,8 @@
 | Язык | Python | 3.8+ |
 | UI Framework | PyQt5 | QWidget, QThread, QSqlDatabase |
 | БД | SQLite | через PyQt5.QtSql (WAL-mode) |
-| Ping | ping3 | ICMP |
-| Уведомления | plyer | системные push |
+| Ping | ping3 / ping.exe | ICMP (сырые сокеты с fallback на системный ping.exe) |
+| Уведомления | PyQt5 / ToastManager | QSystemTrayIcon + всплывающие Toast-уведомления (plyer в spec) |
 | Excel | openpyxl | импорт/экспорт |
 | Helpdesk | playwright | 1.62.0, автоматизация браузера |
 | Сборка | PyInstaller | NetworkMonitor.spec |
@@ -16,11 +16,11 @@
 
 ## Архитектура (кратко)
 - **DI Container** (`di_container.py`) — регистрация и резолв сервисов
-- **DatabaseManager** (`database.py`) — SQLite соединение, WAL, создание таблиц
+- **DatabaseManager** (`database.py`) — SQLite соединение, WAL, миграции schema_version
 - **DataManager** (`data_manager.py`) — CRUD хостов, батч-обновления UI (250 мс throttle), журнал истории
 - **HostRepository** (`core/host_repository.py`) — Repository pattern поверх DataManager
 - **MonitorThread** (`monitor_thread.py`) — QThread, параллельный ping (ThreadPoolExecutor), сигналы Qt
-- **StorageManager** (`storage.py`) — JSON-хранилище конфига, миграция в SQLite (legacy)
+- **StorageManager** (`storage.py`) — JSON-хранилище конфига (AppConfig), миграция в SQLite (legacy)
 - **MainWindow** (`main_window.py`) — главное окно
 
 ## Команды
@@ -32,7 +32,7 @@ pip install -r requirements.txt
 # Установка dev-зависимостей
 pip install -r requirements-dev.txt
 
-# Запуск приложения (требует прав администратора для ICMP)
+# Запуск приложения (права администратора опциональны: для ускоренного ping3 raw socket, при их отсутствии фоллбэк на ping.exe)
 python main.py
 
 # Запуск тестов
