@@ -15,4 +15,4 @@
 
 Если согласовано внедрение принципиально новой мажорной технологии (новая БД, ORM, UI-фреймворк):
 1. Обнови `memory-bank/techContext.md`.
-2. Найди и скачай (через временную папку, см. `bootstrap.md`) 1-3 файла профильных правил именно под эту технологию из `https://github.com/PatrickJS/awesome-cursorrules.git` в `.agent/stack-rules/`. Не копируй весь каталог правил.
+2. Найди и скачай (через временную папку, см. `bootstrap.md`) 1-3 файла профильных правил именно под эту технологию из `https://github.com/PatrickJS/awesome-cursorrules.git` в `.agents/stack-rules/`. Не копируй весь каталог правил.
