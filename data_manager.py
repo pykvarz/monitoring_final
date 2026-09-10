@@ -192,23 +192,33 @@ class DataManager(QObject):
 
         query = QSqlQuery()
         
-        # Обновляем status, last_seen и offline_since всегда.
-        # offline_since может быть None — это осознанный сброс (узел снова ONLINE
-        # или снят с тех.обслуживания), поэтому его нельзя пропускать в SQL,
-        # иначе в БД останется старая (устаревшая) метка начала простоя.
-        sql = """
-            UPDATE hosts 
-            SET status = :status, 
-                last_seen = :last_seen,
-                offline_since = :offline_since
-            WHERE id = :id
-        """
-
-        query.prepare(sql)
-        query.bindValue(":status", status)
-        query.bindValue(":last_seen", datetime.now(timezone.utc).isoformat())
-        query.bindValue(":offline_since", offline_since if offline_since else None)
-        query.bindValue(":id", host_id)
+        # Обновляем status, last_seen и offline_since.
+        # last_seen обновляется только когда узел реально ONLINE (offline_since is None),
+        # чтобы не затирать фактическое время последней доступности узла при сбоях.
+        if offline_since is None:
+            sql = """
+                UPDATE hosts 
+                SET status = :status, 
+                    last_seen = :last_seen,
+                    offline_since = :offline_since
+                WHERE id = :id
+            """
+            query.prepare(sql)
+            query.bindValue(":status", status)
+            query.bindValue(":last_seen", datetime.now(timezone.utc).isoformat())
+            query.bindValue(":offline_since", None)
+            query.bindValue(":id", host_id)
+        else:
+            sql = """
+                UPDATE hosts 
+                SET status = :status, 
+                    offline_since = :offline_since
+                WHERE id = :id
+            """
+            query.prepare(sql)
+            query.bindValue(":status", status)
+            query.bindValue(":offline_since", offline_since)
+            query.bindValue(":id", host_id)
         
         if query.exec_():
             if old_status is not None and old_status != status:

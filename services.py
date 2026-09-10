@@ -99,23 +99,21 @@ class PingService(IPingService):
     """Сервис для выполнения ping-запросов (реализация через ping3)"""
 
     @staticmethod
-    def ping_host(ip: str, timeout: float = 2.0, retries: int = 3) -> Optional[bool]:
-        """Выполнение ping-запроса с фоллбэком на системный ping (с повторами при неудаче)"""
-        for attempt in range(retries):
-            # 1. Попытка через ping3 (быстро, но требует прав)
-            if ping:
-                try:
-                    res = ping(ip, timeout=timeout)
-                    if isinstance(res, float):
-                        return True
-                except (OSError, ValueError, RuntimeError, PermissionError) as e:
-                    if attempt == 0:  # Логируем ошибку только при первой попытке
-                        logging.warning(f"Ошибка ping3 {ip}: {e} (будет использован системный ping)")
+    def ping_host(ip: str, timeout: float = 2.0) -> Optional[bool]:
+        """Выполнение ping-запроса с фоллбэком на системный ping (без внутренних повторов)"""
+        # 1. Попытка через ping3 (быстро, но требует прав)
+        if ping:
+            try:
+                res = ping(ip, timeout=timeout)
+                if isinstance(res, float):
+                    return True
+            except (OSError, ValueError, RuntimeError, PermissionError) as e:
+                logging.warning(f"Ошибка ping3 {ip}: {e} (будет использован системный ping)")
+        
+        # 2. Фоллбэк на системный ping (работает всегда)
+        if PingService._system_ping(ip, timeout):
+            return True
             
-            # 2. Фоллбэк на системный ping (работает всегда)
-            if PingService._system_ping(ip, timeout):
-                return True
-                
         return False
 
     @staticmethod
@@ -134,12 +132,18 @@ class PingService(IPingService):
             if platform.system().lower() == 'windows':
                 creationflags = 0x08000000  # CREATE_NO_WINDOW
                 
-            subprocess.check_call(
+            result = subprocess.run(
                 command, 
-                stdout=subprocess.DEVNULL, 
-                stderr=subprocess.DEVNULL,
-                creationflags=creationflags
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                creationflags=creationflags,
+                text=True
             )
-            return True
-        except (subprocess.CalledProcessError, Exception):
+            # Windows ping returns 0 even on "Request timed out". 
+            # We must check for "TTL=" (English) or "TTL=" (Russian) to confirm a real reply.
+            output = result.stdout.upper()
+            if result.returncode == 0 and "TTL=" in output:
+                return True
+            return False
+        except Exception:
             return False

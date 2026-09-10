@@ -98,7 +98,7 @@ def format_offline_time(duration: timedelta) -> str:
 class HostStatus(Enum):
     """Статусы узлов"""
     ONLINE = ("Online", "#10b981", "🟢", SVG_ONLINE)
-    WAITING = ("Ожидание", "#f59e0b", "🟠", SVG_WAITING)
+    WAITING = ("Waiting", "#f59e0b", "🟠", SVG_WAITING)
     OFFLINE = ("Offline", "#ef4444", "🔴", SVG_OFFLINE)
     MAINTENANCE = ("Тех.обсл.", "#8b5cf6", "🟣", SVG_MAINTENANCE)
 

@@ -127,19 +127,31 @@ class HostManager:
             QMessageBox.information(parent, "Информация", "Выберите узлы")
             return
         
-        new_group, ok = QInputDialog.getItem(
-            parent, "Изменение группы", "Выберите новую группу:",
-            groups + ["Новая группа..."], 0, False
-        )
+        dialog = QInputDialog(parent)
+        dialog.setWindowTitle("Изменение группы")
+        dialog.setLabelText("Выберите новую группу:")
+        dialog.setComboBoxItems(groups + ["Новая группа..."])
+        dialog.setOption(QInputDialog.UseListViewForComboBoxItems, False)
+        theme = getattr(parent._config, "theme", "dark") if hasattr(parent, "_config") else "dark"
+        from constants import get_main_style
+        dialog.setStyleSheet(get_main_style(theme))
+        from theme_manager import set_dark_titlebar
+        set_dark_titlebar(dialog, theme in ("dark", "tactical"))
+        ok = dialog.exec_() == QDialog.Accepted
+        new_group = dialog.textValue()
         
         if not ok:
             return
         
         if new_group == "Новая группа...":
-            new_group, ok = QInputDialog.getText(
-                parent, "Новая группа", "Введите название новой группы:"
-            )
-            if not ok or not new_group.strip():
+            dialog2 = QInputDialog(parent)
+            dialog2.setWindowTitle("Новая группа")
+            dialog2.setLabelText("Введите название новой группы:")
+            dialog2.setStyleSheet(get_main_style(theme))
+            set_dark_titlebar(dialog2, theme in ("dark", "tactical"))
+            ok2 = dialog2.exec_() == QDialog.Accepted
+            new_group = dialog2.textValue()
+            if not ok2 or not new_group.strip():
                 return
             new_group = new_group.strip()
             

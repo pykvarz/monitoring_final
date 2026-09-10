@@ -48,7 +48,7 @@ class HostDialog(QDialog):
         self.setModal(True)
         self.setMinimumWidth(500)
         self.setStyleSheet(get_main_style(self._theme))
-        set_dark_titlebar(self, self._theme == "dark")
+        set_dark_titlebar(self, self._theme in ("dark", "tactical"))
 
         layout = QVBoxLayout()
         form_layout = QFormLayout()
@@ -177,7 +177,7 @@ class SettingsDialog(QDialog):
         self.setModal(True)
         self.setMinimumWidth(500)
         self.setStyleSheet(get_main_style(self._theme))
-        set_dark_titlebar(self, self._theme == "dark")
+        set_dark_titlebar(self, self._theme in ("dark", "tactical"))
 
         layout = QVBoxLayout()
 
@@ -194,22 +194,22 @@ class SettingsDialog(QDialog):
         self._poll_spin.setValue(self._config.poll_interval)
         self._poll_spin.setToolTip("Как часто проверять доступность узлов")
 
-        # Таймаут "Ожидание"
+        # Таймаут "Waiting"
         self._waiting_spin = QSpinBox()
         self._waiting_spin.setRange(10, 600)
         self._waiting_spin.setSuffix(" сек")
         self._waiting_spin.setValue(self._config.waiting_timeout)
-        self._waiting_spin.setToolTip("Через какое время узел переходит в статус 'Ожидание'")
+        self._waiting_spin.setToolTip("Через какое время узел переходит в статус 'Waiting'")
 
         # Таймаут "Offline"
         self._offline_spin = QSpinBox()
         self._offline_spin.setRange(60, 3600)
         self._offline_spin.setSuffix(" сек")
         self._offline_spin.setValue(self._config.offline_timeout)
-        self._poll_spin.setToolTip("Через какое время узел переходит в статус 'Offline'")
+        self._offline_spin.setToolTip("Через какое время узел переходит в статус 'Offline'")
 
         timeout_layout.addRow("Интервал опроса:", self._poll_spin)
-        timeout_layout.addRow("Время до 'Ожидание':", self._waiting_spin)
+        timeout_layout.addRow("Время до 'Waiting':", self._waiting_spin)
         timeout_layout.addRow("Время до 'Offline':", self._offline_spin)
         timeout_group.setLayout(timeout_layout)
 
@@ -281,6 +281,22 @@ class SettingsDialog(QDialog):
         helpdesk_layout.addRow("URL создания заявки:", self._hd_url)
         helpdesk_group.setLayout(helpdesk_layout)
 
+        # Группа: Внешний вид
+        appearance_group = QGroupBox("Внешний вид")
+        appearance_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        appearance_layout = QFormLayout()
+        appearance_layout.setLabelAlignment(Qt.AlignRight)
+        
+        self._theme_combo = QComboBox()
+        self._theme_combo.addItem("Dark", "dark")
+        self._theme_combo.addItem("Tactical NOC", "tactical")
+        idx = self._theme_combo.findData(self._theme)
+        if idx >= 0:
+            self._theme_combo.setCurrentIndex(idx)
+        
+        appearance_layout.addRow("Тема оформления:", self._theme_combo)
+        appearance_group.setLayout(appearance_layout)
+
         # Кнопки
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -291,6 +307,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(notify_group)
         layout.addWidget(history_group)
         layout.addWidget(helpdesk_group)
+        layout.addWidget(appearance_group)
         layout.addStretch()
         layout.addWidget(buttons)
 
@@ -300,7 +317,7 @@ class SettingsDialog(QDialog):
         """Получение конфигурации.
 
         Диалог редактирует только часть полей AppConfig (таймауты, потоки,
-        уведомления). Остальные поля (тема, порядок/ширина/видимость столбцов,
+        уведомления, тему). Остальные поля (порядок/ширина/видимость столбцов,
         пользовательские группы) не показаны в этом окне и должны сохраняться
         такими, какими они были — иначе каждое нажатие OK тут будет незаметно
         сбрасывать их на значения по умолчанию.
@@ -318,6 +335,6 @@ class SettingsDialog(QDialog):
             column_widths=dict(self._config.column_widths),
             column_order=list(self._config.column_order),
             hidden_columns=list(self._config.hidden_columns),
-            theme=self._config.theme,
+            theme=self._theme_combo.currentData(),
             custom_groups=list(self._config.custom_groups),
         )

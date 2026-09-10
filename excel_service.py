@@ -206,7 +206,7 @@ class ExcelService:
             status_titles = {
                 "ONLINE": "Online",
                 "OFFLINE": "Offline",
-                "WAITING": "Ожидание",
+                "WAITING": "Waiting",
                 "MAINTENANCE": "Тех.обслуживание"
             }
 

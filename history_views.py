@@ -89,21 +89,30 @@ class EventCardWidget(QFrame):
         status_info = {
             "ONLINE":       ("Online",              COLOR_ONLINE, "rgba(16, 185, 129, 0.15)", "●"),
             "OFFLINE":      ("Offline",             COLOR_OFFLINE, "rgba(239, 68, 68, 0.15)", "●"),
-            "WAITING":      ("Ожидание",            COLOR_WAITING, "rgba(245, 158, 11, 0.15)", "●"),
+            "WAITING":      ("Waiting",             COLOR_WAITING, "rgba(245, 158, 11, 0.15)", "●"),
             "MAINTENANCE":  ("Тех.обсл.",           COLOR_MAINTENANCE, "rgba(139, 92, 246, 0.15)", "●"),
         }
         st_title, st_color, st_bg, st_icon = status_info.get(status_code, (status_code, "#888888", "rgba(136, 136, 136, 0.15)", "•"))
 
-        is_dark = theme == "dark"
-        bg = "#1e222b" if is_dark else "#ffffff"
-        bg_hover = "#252b37" if is_dark else "#f8fafc"
-        border = "#2a2f3d" if is_dark else "#e2e8f0"
+        is_dark = theme in ("dark", "tactical")
+        if theme == "tactical":
+            bg = "#0D1117"
+            bg_hover = "#161B22"
+            border = "#1F232D"
+            self.name_color = "#E2E8F0"
+        else:
+            bg = "#1e222b" if is_dark else "#ffffff"
+            bg_hover = "#252b37" if is_dark else "#f8fafc"
+            border = "#2a2f3d" if is_dark else "#e2e8f0"
+            self.name_color = "#f1f5f9" if is_dark else "#1e293b"
+            
+        border_radius = "0px" if theme == "tactical" else "8px"
         self.setStyleSheet(f"""
             EventCardWidget {{
                 background-color: {bg};
                 border: 1px solid {border};
                 border-left: 4px solid {st_color};
-                border-radius: 8px;
+                border-radius: {border_radius};
             }}
             EventCardWidget:hover {{
                 background-color: {bg_hover};
@@ -125,12 +134,13 @@ class EventCardWidget(QFrame):
 
         badge = QLabel(f"{st_icon} {st_title}")
         badge.setAlignment(Qt.AlignCenter)
+        badge_radius = '0px' if theme == 'tactical' else '9px'
         badge.setStyleSheet(f"""
             QLabel {{
                 color: {st_color};
                 border: 1px solid {st_color};
                 background-color: {st_bg};
-                border-radius: 9px;
+                border-radius: {badge_radius};
                 padding: 2px 8px;
                 font-size: 11px;
                 font-weight: bold;
@@ -142,8 +152,7 @@ class EventCardWidget(QFrame):
 
         # Нижняя строка: Имя узла
         name_lbl = QLabel(host_name)
-        name_color = "#f1f5f9" if is_dark else "#1e293b"
-        name_lbl.setStyleSheet(f"color: {name_color}; font-size: 14px; font-weight: bold; border: none; background: transparent;")
+        name_lbl.setStyleSheet(f"color: {self.name_color}; font-size: 14px; font-weight: bold; border: none; background: transparent;")
         layout.addWidget(name_lbl)
 
 
@@ -157,7 +166,7 @@ class EventLogPanel(QFrame):
         ("Все", None),
         ("Online", "ONLINE"),
         ("Offline", "OFFLINE"),
-        ("Ожидание", "WAITING"),
+        ("Waiting", "WAITING"),
         ("Тех.обсл.", "MAINTENANCE"),
     ]
 
@@ -181,12 +190,15 @@ class EventLogPanel(QFrame):
         self.setMaximumWidth(16777215)
         self.setFrameShape(QFrame.StyledPanel)
         
-        is_dark = self._theme == "dark"
+        is_dark = self._theme in ("dark", "tactical")
+        bg_color = '#090A0F' if self._theme == 'tactical' else ('#181c26' if is_dark else '#ffffff')
+        border_color = '#1F232D' if self._theme == 'tactical' else ('#282e3d' if is_dark else '#d0d7de')
+        border_radius = '0px' if self._theme == 'tactical' else '8px'
         self.setStyleSheet(f"""
             EventLogPanel {{
-                background-color: {'#181c26' if is_dark else '#ffffff'};
-                border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
-                border-radius: 8px;
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+                border-radius: {border_radius};
             }}
         """)
         layout = QVBoxLayout(self)
@@ -348,12 +360,15 @@ class EventLogPanel(QFrame):
 
     def set_theme(self, theme: str):
         self._theme = theme
-        is_dark = theme == "dark"
+        is_dark = theme in ("dark", "tactical")
+        bg_color = '#090A0F' if theme == 'tactical' else ('#181c26' if is_dark else '#ffffff')
+        border_color = '#1F232D' if theme == 'tactical' else ('#282e3d' if is_dark else '#d0d7de')
+        border_radius = '0px' if theme == 'tactical' else '8px'
         self.setStyleSheet(f"""
             EventLogPanel {{
-                background-color: {'#181c26' if is_dark else '#ffffff'};
-                border: 1px solid {'#282e3d' if is_dark else '#d0d7de'};
-                border-radius: 8px;
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+                border-radius: {border_radius};
             }}
         """)
         if hasattr(self, '_btn_clear') and self._btn_clear:
@@ -401,7 +416,7 @@ class HostHistoryDialog(QDialog):
     EVENT_LABELS = {
         "ONLINE":       ("●", "Online",              COLOR_ONLINE),
         "OFFLINE":      ("●", "Offline",             COLOR_OFFLINE),
-        "WAITING":      ("●", "Ожидание",            COLOR_WAITING),
+        "WAITING":      ("●", "Waiting",             COLOR_WAITING),
         "MAINTENANCE":  ("●", "Тех.обслуживание",    COLOR_MAINTENANCE),
     }
 
@@ -421,7 +436,7 @@ class HostHistoryDialog(QDialog):
         self.refresh()
 
     def _init_ui(self):
-        is_dark = self._theme == "dark"
+        is_dark = self._theme in ("dark", "tactical")
         self.setStyleSheet(get_main_style(self._theme))
         set_dark_titlebar(self, is_dark)
         layout = QVBoxLayout(self)
@@ -430,17 +445,23 @@ class HostHistoryDialog(QDialog):
 
         # 1. Шапка с информацией об узле
         header_card = QFrame()
-        is_dark = self._theme == "dark"
-        card_bg = "#2b2d30" if is_dark else "#f6f8fa"
-        card_border = "#404040" if is_dark else "#d0d7de"
-        text_color = "#e1e1e1" if is_dark else "#24292f"
-        text_sec = "#aaaaaa" if is_dark else "#57606a"
+        if self._theme == "tactical":
+            card_bg = "#0D1117"
+            card_border = "#1F232D"
+            text_color = "#E2E8F0"
+            text_sec = "#64748B"
+        else:
+            card_bg = "#2b2d30" if is_dark else "#f6f8fa"
+            card_border = "#404040" if is_dark else "#d0d7de"
+            text_color = "#e1e1e1" if is_dark else "#24292f"
+            text_sec = "#aaaaaa" if is_dark else "#57606a"
 
+        card_radius = "0px" if self._theme == "tactical" else "8px"
         header_card.setStyleSheet(f"""
             QFrame {{
                 background-color: {card_bg};
                 border: 1px solid {card_border};
-                border-radius: 8px;
+                border-radius: {card_radius};
                 padding: 10px;
             }}
         """)
@@ -489,11 +510,12 @@ class HostHistoryDialog(QDialog):
 
         def _create_metric_box(title: str):
             box = QFrame()
+            box_radius = "0px" if self._theme == "tactical" else "6px"
             box.setStyleSheet(f"""
                 QFrame {{
                     background-color: {card_bg};
                     border: 1px solid {card_border};
-                    border-radius: 6px;
+                    border-radius: {box_radius};
                     padding: 6px;
                 }}
             """)
@@ -712,7 +734,7 @@ class HistoryDialog(QDialog):
         ("Все события", None),
         ("Упал (Offline)", "OFFLINE"),
         ("Восстановлен (Online)", "ONLINE"),
-        ("Не отвечает (Ожидание)", "WAITING"),
+        ("Не отвечает (Waiting)", "WAITING"),
         ("Тех.обслуживание", "MAINTENANCE"),
     ]
 
@@ -731,7 +753,7 @@ class HistoryDialog(QDialog):
         self._refresh()
 
     def _init_ui(self):
-        is_dark = self._theme == "dark"
+        is_dark = self._theme in ("dark", "tactical")
         self.setStyleSheet(get_main_style(self._theme))
         set_dark_titlebar(self, is_dark)
         layout = QVBoxLayout(self)

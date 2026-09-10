@@ -45,15 +45,15 @@ class TestMonitorLogic(unittest.TestCase):
         self.assertEqual(new_status, "ONLINE")
         self.assertTrue(update) # Threshold exceeded, should update
 
-    def test_online_to_waiting_logic(self):
-        # Initial failure immediately transitions to WAITING
+    def test_initial_failure_remains_online(self):
+        # Initial failure leaves status as ONLINE but sets offline_since
         host = Host(id="1", ip="127.0.0.1", name="Local", status="ONLINE")
         ping_status = "OFFLINE"
         now = datetime.now(timezone.utc)
         
         new_status, offline_since, update = self.thread._calculate_status(host, ping_status, now)
         
-        self.assertEqual(new_status, "WAITING")
+        self.assertEqual(new_status, "ONLINE")
         self.assertIsNotNone(offline_since)
         self.assertTrue(update)
 
@@ -109,9 +109,40 @@ class TestMonitorLogic(unittest.TestCase):
         now = datetime.now(timezone.utc)
         
         new_status, offline_since, update = self.thread._calculate_status(host, ping_status, now)
-        
         self.assertEqual(new_status, "MAINTENANCE")
         self.assertFalse(update)
+        
+    def test_continuous_outage_transitions_to_waiting_and_offline(self):
+        """Проверка непрерывного сбоя: ONLINE -> WAITING (через waiting_timeout) -> OFFLINE (через offline_timeout)"""
+        host = Host(id="h_cont", ip="192.168.1.50", name="Server-X", status="ONLINE")
+        t0 = datetime.now(timezone.utc)
+        
+        # Цикл 1: первый сбой (T=0)
+        st1, os1, up1 = self.thread._calculate_status(host, "OFFLINE", t0)
+        self.assertEqual(st1, "ONLINE")
+        self.assertIsNotNone(os1)
+        self.assertTrue(up1)
+        host.offline_since = os1
+        
+        # Имитируем поведение run(): статус в кеше потока
+        self.thread._known_statuses[host.id] = st1
+        self.thread._offline_since_cache[host.id] = os1
+        
+        # Цикл 2: сбой продолжается спустя 65 сек (> waiting_timeout 5с в тесте)
+        t_wait = t0 + timedelta(seconds=10)
+        st2, os2, up2 = self.thread._calculate_status(host, "OFFLINE", t_wait)
+        self.assertEqual(st2, "WAITING")
+        self.assertEqual(os2, os1, "offline_since не должен сбрасываться!")
+        self.assertTrue(up2)
+        host.status = st2
+        self.thread._known_statuses[host.id] = st2
+        
+        # Цикл 3: сбой продолжается спустя 35 сек (> offline_timeout 30с в тесте)
+        t_off = t0 + timedelta(seconds=35)
+        st3, os3, up3 = self.thread._calculate_status(host, "OFFLINE", t_off)
+        self.assertEqual(st3, "OFFLINE")
+        self.assertEqual(os3, os1, "offline_since должен сохранять исходное время начала сбоя!")
+        self.assertTrue(up3)
 
 if __name__ == '__main__':
     unittest.main()

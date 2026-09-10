@@ -228,9 +228,10 @@ class TestStatusMachineStuckOnline(unittest.TestCase):
         self.assertEqual(hosts[0].offline_since, offline_ts)
 
     def test_status_machine_transitions_to_waiting(self):
-        """Хост переходит из ONLINE в WAITING немедленно при первой потере.
+        """Хост переходит из ONLINE в WAITING только после waiting_timeout.
     
-        Шаг 1: При первом сбое фиксируем offline_since и сразу ставим WAITING.
+        Шаг 1: При первом сбое фиксируем offline_since, но оставляем ONLINE.
+        Шаг 2: После waiting_timeout статус меняется на WAITING.
         """
         mt = MonitorThread(self.repository, self.config, db_name=":memory:")
     
@@ -239,14 +240,14 @@ class TestStatusMachineStuckOnline(unittest.TestCase):
         host = _make_host(status='ONLINE', offline_since=None)
         ns, os_val, upd = mt._calculate_status(host, 'OFFLINE', t1)
     
-        # Статус сразу WAITING, offline_since установлен
-        self.assertEqual(ns, 'WAITING')
+        # Статус пока ONLINE, offline_since установлен
+        self.assertEqual(ns, 'ONLINE')
         self.assertIsNotNone(os_val)
         self.assertTrue(upd)
     
         # Цикл 2: через 90 секунд (> waiting_timeout=60)
         t2 = t1 + timedelta(seconds=90)
-        host2 = _make_host(status='WAITING', offline_since=os_val)
+        host2 = _make_host(status='ONLINE', offline_since=os_val)
         ns2, os_val2, upd2 = mt._calculate_status(host2, 'OFFLINE', t2)
 
         self.assertEqual(ns2, 'WAITING',

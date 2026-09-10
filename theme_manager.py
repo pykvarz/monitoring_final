@@ -47,18 +47,32 @@ def apply_app_palette(theme: str = "dark") -> None:
     if not app:
         return
     palette = QPalette()
-    palette.setColor(QPalette.Window, QColor("#151820"))
-    palette.setColor(QPalette.WindowText, QColor("#f1f5f9"))
-    palette.setColor(QPalette.Base, QColor("#181c26"))
-    palette.setColor(QPalette.AlternateBase, QColor("#1e222e"))
-    palette.setColor(QPalette.ToolTipBase, QColor("#1c202a"))
-    palette.setColor(QPalette.ToolTipText, QColor("#f1f5f9"))
-    palette.setColor(QPalette.Text, QColor("#f1f5f9"))
-    palette.setColor(QPalette.Button, QColor("#1c202a"))
-    palette.setColor(QPalette.ButtonText, QColor("#f1f5f9"))
-    palette.setColor(QPalette.BrightText, QColor("#ffffff"))
-    palette.setColor(QPalette.Highlight, QColor("#2563eb"))
-    palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
+    if theme == "tactical":
+        palette.setColor(QPalette.Window, QColor("#090A0F"))
+        palette.setColor(QPalette.WindowText, QColor("#E2E8F0"))
+        palette.setColor(QPalette.Base, QColor("#0D1117"))
+        palette.setColor(QPalette.AlternateBase, QColor("#0D1117"))
+        palette.setColor(QPalette.ToolTipBase, QColor("#0D1117"))
+        palette.setColor(QPalette.ToolTipText, QColor("#E2E8F0"))
+        palette.setColor(QPalette.Text, QColor("#E2E8F0"))
+        palette.setColor(QPalette.Button, QColor("#0D1117"))
+        palette.setColor(QPalette.ButtonText, QColor("#E2E8F0"))
+        palette.setColor(QPalette.BrightText, QColor("#ffffff"))
+        palette.setColor(QPalette.Highlight, QColor("#1F2937"))
+        palette.setColor(QPalette.HighlightedText, QColor("#39FF14"))
+    else:
+        palette.setColor(QPalette.Window, QColor("#151820"))
+        palette.setColor(QPalette.WindowText, QColor("#f1f5f9"))
+        palette.setColor(QPalette.Base, QColor("#181c26"))
+        palette.setColor(QPalette.AlternateBase, QColor("#1e222e"))
+        palette.setColor(QPalette.ToolTipBase, QColor("#1c202a"))
+        palette.setColor(QPalette.ToolTipText, QColor("#f1f5f9"))
+        palette.setColor(QPalette.Text, QColor("#f1f5f9"))
+        palette.setColor(QPalette.Button, QColor("#1c202a"))
+        palette.setColor(QPalette.ButtonText, QColor("#f1f5f9"))
+        palette.setColor(QPalette.BrightText, QColor("#ffffff"))
+        palette.setColor(QPalette.Highlight, QColor("#2563eb"))
+        palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
     app.setPalette(palette)
 
 
@@ -111,14 +125,16 @@ class ThemeManager:
 
     def get_current_theme(self) -> str:
         """Получение текущей темы"""
+        if hasattr(self._config, 'theme') and self._config.theme:
+            return self._config.theme
         return "dark"
 
 
 
     def _apply_theme(self, theme: str = "dark") -> None:
-        """Применение тёмной темы ко всем компонентам"""
+        """Применение темы ко всем компонентам"""
         
-        apply_app_palette()
+        apply_app_palette(theme)
         set_dark_titlebar(self._window, True)
 
         # Основные стили окна

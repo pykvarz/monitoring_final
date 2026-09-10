@@ -52,6 +52,7 @@ class MonitorThread(QThread):
         # Время последнего восстановления узла (OFFLINE/WAITING → ONLINE).
         # Используется для определения устаревшего offline_since из БД.
         self._recovery_times: Dict[str, datetime] = {}
+        self._offline_since_cache: Dict[str, str] = {}
         self._update_executor()
 
     def _update_executor(self) -> None:
@@ -89,6 +90,8 @@ class MonitorThread(QThread):
     def remove_from_cache(self, host_id: str) -> None:
         """Удалить хост из кеша статусов (при удалении хоста)"""
         self._known_statuses.pop(host_id, None)
+        self._recovery_times.pop(host_id, None)
+        self._offline_since_cache.pop(host_id, None)
 
     def pause(self) -> None:
         """Приостановить мониторинг"""
@@ -191,23 +194,31 @@ class MonitorThread(QThread):
                             # Логика смены статуса (Domain Logic)
                             new_status, offline_since, should_update = self._calculate_status(host, ping_status, current_time)
 
+                            prev_status = self._known_statuses.get(host_id, host.status)
+
                             if should_update:
                                 # Use signal to update in Main Thread (Thread Safety)
                                 self.host_status_changed.emit(host_id, new_status, offline_since)
                                 
                                 # Notification Logic — используем кеш статусов потока
-                                prev_status = self._known_statuses.get(host_id, host.status)
                                 if new_status == "OFFLINE" and prev_status != "OFFLINE" and host.notifications_enabled:
                                     newly_offline.append(host.name)
-                                elif new_status == "ONLINE" and prev_status == "OFFLINE" and host.notifications_enabled:
+                                elif new_status == "ONLINE" and prev_status in ("OFFLINE", "WAITING") and host.notifications_enabled:
                                     newly_recovered.append(host.name)
                                 
-                                # Обновляем кеш
+                                # Обновляем кеш статусов
                                 self._known_statuses[host_id] = new_status
-                                # Фиксируем момент восстановления для сброса
-                                # устаревшего offline_since при следующем падении
-                                if new_status == "ONLINE":
+
+                            # ВАЖНО: Фиксируем момент реального восстановления для сброса
+                            # устаревшего offline_since при последующих падениях.
+                            # Восстановление происходит ТОЛЬКО когда ping успешен (ONLINE)
+                            # и узел до этого был в сбое (prev_status != ONLINE или имел offline_since).
+                            if ping_status == "ONLINE":
+                                if prev_status in ("WAITING", "OFFLINE") or host.offline_since is not None or host_id in self._offline_since_cache:
                                     self._recovery_times[host_id] = current_time
+                                self._offline_since_cache.pop(host_id, None)
+                            elif ping_status == "OFFLINE" and offline_since:
+                                self._offline_since_cache[host_id] = offline_since
 
                         except Exception as e:
                             logging.error(f"Error processing host result: {e}")
@@ -292,6 +303,10 @@ class MonitorThread(QThread):
             if host.status == "MAINTENANCE":
                 return host.status, host.offline_since, False
 
+            # Восстанавливаем offline_since из локального кеша потока, если в объекте host он еще пуст
+            if not offline_since and host.id in self._offline_since_cache:
+                offline_since = self._offline_since_cache[host.id]
+
             # 1. Проверяем, не является ли offline_since устаревшим от прошлого падения
             recovery_time = self._recovery_times.get(host.id)
             if offline_since and recovery_time:
@@ -299,7 +314,7 @@ class MonitorThread(QThread):
                     os_dt = datetime.fromisoformat(offline_since)
                     if os_dt.tzinfo is None:
                         os_dt = os_dt.replace(tzinfo=timezone.utc)
-                    if os_dt <= recovery_time:
+                    if os_dt < recovery_time:
                         offline_since = None  # Устаревший от прошлого падения — сбрасываем!
                 except ValueError:
                     offline_since = None
@@ -330,10 +345,14 @@ class MonitorThread(QThread):
                         if host.status != "OFFLINE":
                             new_status = "OFFLINE"
                             should_update = True
-                    else:
+                    elif duration >= self._config.waiting_timeout:
                         if host.status != "WAITING":
                             new_status = "WAITING"
                             should_update = True
+                    else:
+                        # Еще не прошло время для статуса 'Ожидание'. 
+                        # Остаемся в текущем статусе (обычно ONLINE).
+                        pass
                 except ValueError:
                     offline_since = current_time.isoformat()
                     should_update = True

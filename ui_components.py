@@ -106,7 +106,7 @@ class UIComponents:
         dashboard_labels = {
             'total': UIComponents._create_stat_card("total", SVG_CARD_TOTAL, "Всего узлов", "0", COLOR_TOTAL, theme),
             'online': UIComponents._create_stat_card("online", SVG_CARD_ONLINE, "Online", "0", COLOR_ONLINE, theme),
-            'waiting': UIComponents._create_stat_card("waiting", SVG_CARD_WAITING, "Ожидание", "0", COLOR_WAITING, theme),
+            'waiting': UIComponents._create_stat_card("waiting", SVG_CARD_WAITING, "Waiting", "0", COLOR_WAITING, theme),
             'offline': UIComponents._create_stat_card("offline", SVG_CARD_OFFLINE, "Offline", "0", COLOR_OFFLINE, theme),
             'maintenance': UIComponents._create_stat_card("maintenance", SVG_CARD_MAINTENANCE, "Тех.обсл.", "0", COLOR_MAINTENANCE, theme)
         }

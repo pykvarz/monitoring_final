@@ -564,7 +564,16 @@ class MainWindow(QMainWindow):
         HostManager.add_host(self, self._groups, self._repository)
 
     def _add_group(self) -> None:
-        group_name, ok = QInputDialog.getText(self, "Новая группа", "Введите название группы:", text="")
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("Новая группа")
+        dialog.setLabelText("Введите название группы:")
+        from constants import get_main_style
+        dialog.setStyleSheet(get_main_style(self._config.theme))
+        from theme_manager import set_dark_titlebar
+        set_dark_titlebar(dialog, self._config.theme in ("dark", "tactical"))
+        ok = dialog.exec_() == QDialog.Accepted
+        group_name = dialog.textValue()
+        
         if ok and group_name.strip():
             group_name = group_name.strip()
             if group_name not in self._groups:
@@ -624,10 +633,12 @@ class MainWindow(QMainWindow):
             self._config.history_retention_days = new_config.history_retention_days
             self._config.helpdesk_enabled = new_config.helpdesk_enabled
             self._config.helpdesk_url = new_config.helpdesk_url
+            self._config.theme = new_config.theme
 
             if self._storage.save_config(self._config):
                 self._monitor_thread.update_config(self._config)
                 self._repository.purge_old_history(self._config.history_retention_days)
+                self._theme_manager._apply_theme(self._config.theme)
                 self.statusBar().showMessage("Настройки сохранены", 3000)
 
     def _force_scan(self):

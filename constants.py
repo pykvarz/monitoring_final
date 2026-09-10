@@ -17,9 +17,81 @@ DARK_TEXT = "#f1f5f9"
 DARK_TEXT_SECONDARY = "#94a3b8"
 DARK_SELECTION = "#2563eb"
 
+# Цвета темы Tactical (NOC Terminal)
+TACTICAL_BG = "#090A0F"
+TACTICAL_SURFACE = "#0D1117"
+TACTICAL_BORDER = "#1F232D"
+TACTICAL_TEXT = "#E2E8F0"
+TACTICAL_TEXT_SECONDARY = "#64748B"
+TACTICAL_SELECTION = "#1F2937"
+TACTICAL_ONLINE = "#39FF14"
+TACTICAL_WAITING = "#FBBF24"
+TACTICAL_OFFLINE = "#EF4444"
+TACTICAL_MAINTENANCE = "#A855F7"
+TACTICAL_TOTAL = "#00F0FF"
+
 # CSS Стили
 
 def get_table_style(theme="dark"):
+    if theme == "tactical":
+        return f"""
+        QTableView, QTableWidget {{
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            background-color: {TACTICAL_BG};
+            alternate-background-color: {TACTICAL_SURFACE};
+            gridline-color: {TACTICAL_BORDER};
+            selection-background-color: {TACTICAL_SELECTION};
+            selection-color: {TACTICAL_ONLINE};
+            color: {TACTICAL_TEXT};
+            show-decoration-selected: 1;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 13px;
+        }}
+        QHeaderView::section {{
+            background-color: {TACTICAL_SURFACE};
+            padding: 8px 10px;
+            border: none;
+            border-bottom: 1px solid {TACTICAL_BORDER};
+            border-right: 1px solid {TACTICAL_BORDER};
+            font-weight: bold;
+            color: {TACTICAL_TEXT_SECONDARY};
+            text-transform: uppercase;
+            font-family: Consolas, "Courier New", monospace;
+        }}
+        QScrollBar:vertical {{
+            background: {TACTICAL_BG};
+            width: 8px;
+            margin: 0px;
+        }}
+        QScrollBar::handle:vertical {{
+            background: {TACTICAL_BORDER};
+            min-height: 20px;
+            border-radius: 0px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            height: 0px;
+        }}
+        QScrollBar:horizontal {{
+            background: {TACTICAL_BG};
+            height: 8px;
+            margin: 0px;
+        }}
+        QScrollBar::handle:horizontal {{
+            background: {TACTICAL_BORDER};
+            min-width: 20px;
+            border-radius: 0px;
+        }}
+        QScrollBar::handle:horizontal:hover {{
+            background: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+            width: 0px;
+        }}
+        """
     return f"""
         QTableView, QTableWidget {{
             border: 1px solid {DARK_BORDER};
@@ -87,7 +159,7 @@ def get_dashboard_style(theme="dark"):
     """
 
 def get_stat_card_style(key_or_color: str, theme="dark"):
-    """Создание стиля для карточки статистики в стиле неоновых рамок из макета"""
+    """Создание стиля для карточки статистики"""
     key_map = {
         COLOR_TOTAL: "total",
         COLOR_ONLINE: "online",
@@ -101,6 +173,29 @@ def get_stat_card_style(key_or_color: str, theme="dark"):
         "maintenance": "maintenance",
     }
     card_key = key_map.get(key_or_color, "total")
+
+    if theme == "tactical":
+        config = {
+            "total":       {"border": TACTICAL_TOTAL, "bg": "#0D1117", "hover": "#161B22", "color": TACTICAL_TOTAL},
+            "online":      {"border": TACTICAL_ONLINE, "bg": "#0D1117", "hover": "#161B22", "color": TACTICAL_ONLINE},
+            "waiting":     {"border": TACTICAL_WAITING, "bg": "#0D1117", "hover": "#161B22", "color": TACTICAL_WAITING},
+            "offline":     {"border": TACTICAL_OFFLINE, "bg": "#0D1117", "hover": "#161B22", "color": TACTICAL_OFFLINE},
+            "maintenance": {"border": TACTICAL_MAINTENANCE, "bg": "#0D1117", "hover": "#161B22", "color": TACTICAL_MAINTENANCE},
+        }.get(card_key, {"border": TACTICAL_BORDER, "bg": TACTICAL_SURFACE, "hover": TACTICAL_SELECTION, "color": TACTICAL_TEXT})
+        return f"""
+            QLabel {{
+                background-color: {config['bg']};
+                border: 1px solid {TACTICAL_BORDER};
+                border-left: 3px solid {config['border']};
+                border-radius: 0px;
+                padding: 6px 14px 6px 10px;
+                min-width: 130px;
+                font-family: Consolas, "Courier New", monospace;
+            }}
+            QLabel:hover {{
+                background-color: {config['hover']};
+            }}
+        """
 
     config = {
         "total":       {"border": "#2563eb", "bg": "#141c2c", "hover": "#1a253a"},
@@ -124,6 +219,24 @@ def get_stat_card_style(key_or_color: str, theme="dark"):
     """
 
 def get_button_style(theme="dark"):
+    if theme == "tactical":
+        return f"""
+        QPushButton {{
+            padding: 6px 12px;
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            background-color: {TACTICAL_SURFACE};
+            color: {TACTICAL_TEXT};
+            font-family: Consolas, "Courier New", monospace;
+        }}
+        QPushButton:hover {{
+            background-color: {TACTICAL_BORDER};
+            border-color: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QPushButton:pressed {{
+            background-color: {TACTICAL_SELECTION};
+        }}
+        """
     return f"""
         QPushButton {{
             padding: 6px 12px;
@@ -141,6 +254,105 @@ def get_button_style(theme="dark"):
     """
 
 def get_main_style(theme="dark"):
+    if theme == "tactical":
+        font_family = 'Consolas, "Courier New", monospace'
+        return f"""
+        QWidget {{
+            font-family: {font_family};
+        }}
+        QMainWindow, QDialog {{
+            background-color: {TACTICAL_BG};
+            color: {TACTICAL_TEXT};
+        }}
+        QLabel {{
+            color: {TACTICAL_TEXT};
+        }}
+        QMenuBar {{
+            background-color: {TACTICAL_BG};
+            color: {TACTICAL_TEXT};
+            border-bottom: 1px solid {TACTICAL_BORDER};
+            padding: 2px 4px;
+        }}
+        QMenuBar::item {{
+            background-color: transparent;
+            color: {TACTICAL_TEXT};
+            padding: 4px 10px;
+            border-radius: 0px;
+        }}
+        QMenuBar::item:selected {{
+            background-color: {TACTICAL_SELECTION};
+        }}
+        QMenu {{
+            background-color: {TACTICAL_SURFACE};
+            color: {TACTICAL_TEXT};
+            border: 1px solid {TACTICAL_BORDER};
+        }}
+        QMenu::item:selected {{
+            background-color: {TACTICAL_SELECTION};
+        }}
+        QStatusBar {{
+            background-color: {TACTICAL_BG};
+            color: {TACTICAL_TEXT_SECONDARY};
+            border-top: 1px solid {TACTICAL_BORDER};
+        }}
+        QLineEdit, QSpinBox {{
+            background-color: {TACTICAL_SURFACE};
+            color: {TACTICAL_TEXT};
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            padding: 4px 8px;
+            selection-background-color: {TACTICAL_SELECTION};
+            font-family: {font_family};
+        }}
+        QLineEdit:focus, QSpinBox:focus {{
+            border-color: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QGroupBox {{
+            font-weight: bold;
+            color: {TACTICAL_TEXT};
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            margin-top: 12px;
+            padding-top: 14px;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            left: 10px;
+            padding: 0 4px;
+            color: {TACTICAL_TEXT};
+        }}
+        QCheckBox {{
+            color: {TACTICAL_TEXT};
+            spacing: 6px;
+        }}
+        QDialogButtonBox QPushButton, QMessageBox QPushButton {{
+            background-color: {TACTICAL_SURFACE};
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            padding: 5px 16px;
+            color: {TACTICAL_TEXT};
+            font-weight: 500;
+            min-width: 65px;
+            font-family: {font_family};
+        }}
+        QDialogButtonBox QPushButton:hover, QMessageBox QPushButton:hover {{
+            background-color: {TACTICAL_BORDER};
+            border-color: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QDialogButtonBox QPushButton:pressed, QMessageBox QPushButton:pressed {{
+            background-color: {TACTICAL_SELECTION};
+        }}
+        QToolTip {{
+            background-color: {TACTICAL_SURFACE};
+            color: {TACTICAL_TEXT};
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-family: {font_family};
+        }}
+        """
     font_family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
     return f"""
         QWidget {{
@@ -339,6 +551,48 @@ def get_menubar_style(theme="dark"):
     """
 
 def get_combobox_style(theme="dark"):
+    if theme == "tactical":
+        return f"""
+        QComboBox {{
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            padding: 3px 10px;
+            background-color: {TACTICAL_SURFACE};
+            color: {TACTICAL_TEXT};
+            font-size: 12px;
+            font-family: Consolas, "Courier New", monospace;
+        }}
+        QComboBox:hover {{
+            border-color: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QComboBox::drop-down {{
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 20px;
+            border: none;
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {TACTICAL_SURFACE};
+            color: {TACTICAL_TEXT};
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            selection-background-color: {TACTICAL_SELECTION};
+            selection-color: {TACTICAL_ONLINE};
+            padding: 4px;
+            outline: none;
+            font-family: Consolas, "Courier New", monospace;
+        }}
+        QComboBox QAbstractItemView::item {{
+            min-height: 24px;
+            padding: 3px 8px;
+            color: {TACTICAL_TEXT};
+        }}
+        QComboBox QAbstractItemView::item:hover,
+        QComboBox QAbstractItemView::item:selected {{
+            background-color: {TACTICAL_SELECTION};
+            color: {TACTICAL_ONLINE};
+        }}
+        """
     return f"""
         QComboBox {{
             border: 1px solid {DARK_BORDER};

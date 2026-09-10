@@ -61,7 +61,7 @@ class TestThemeManager(unittest.TestCase):
     
     def test_get_current_theme(self):
         """Test getting current theme."""
-        self.assertEqual(self.theme_manager.get_current_theme(), "dark")
+        self.assertEqual(self.theme_manager.get_current_theme(), "light")
     
 
     
