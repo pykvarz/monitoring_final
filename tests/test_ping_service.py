@@ -86,5 +86,30 @@ class TestPingService(unittest.TestCase):
         self.assertTrue(result)
         mock_subprocess.assert_called_once()
 
+    @patch('services.ping', None)
+    @patch('subprocess.run')
+    def test_system_ping_timeout_passed_to_subprocess(self, mock_subprocess):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "TTL=64"
+        mock_subprocess.return_value = mock_result
+
+        PingService.ping_host("127.0.0.1", timeout=2.5)
+
+        self.assertTrue(mock_subprocess.called)
+        _, kwargs = mock_subprocess.call_args
+        self.assertIn('timeout', kwargs, "subprocess.run must be called with an explicit timeout")
+        self.assertGreaterEqual(kwargs['timeout'], 2.5)
+
+    @patch('services.ping', None)
+    @patch('subprocess.run')
+    def test_system_ping_handles_timeout_expired(self, mock_subprocess):
+        mock_subprocess.side_effect = subprocess.TimeoutExpired(cmd=['ping'], timeout=3.0)
+
+        result = PingService.ping_host("10.255.255.1", timeout=2.0)
+        self.assertFalse(result, "TimeoutExpired must be caught and return False")
+
+
 if __name__ == '__main__':
     unittest.main()
+

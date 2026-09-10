@@ -251,9 +251,12 @@ class HostTableModel(QAbstractTableModel):
             elif column == 1: return host.name.lower()
             elif column == 2:
                 try:
-                    return [int(part) for part in host.ip.split('.')]
+                    parts = [int(part) for part in host.ip.split('.')]
+                    if len(parts) == 4 and all(0 <= p <= 255 for p in parts):
+                        return (0, parts, "")
+                    return (1, [], host.ip.lower())
                 except Exception:
-                    return host.ip
+                    return (1, [], host.ip.lower())
             elif column == 3: return host.address.lower()
             elif column == 4: return host.group.lower()
             elif column == 5:

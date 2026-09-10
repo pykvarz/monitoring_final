@@ -10,6 +10,7 @@ from typing import List, Dict, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 import time
 import logging
+import threading
 
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtSql import QSqlDatabase
@@ -53,20 +54,24 @@ class MonitorThread(QThread):
         # Используется для определения устаревшего offline_since из БД.
         self._recovery_times: Dict[str, datetime] = {}
         self._offline_since_cache: Dict[str, str] = {}
+        self._executor_lock = threading.Lock()
         self._update_executor()
 
     def _update_executor(self) -> None:
-        """Обновление пула потоков"""
-        if self._executor:
+        """Обновление пула потоков с защитой блокировкой"""
+        with self._executor_lock:
+            old_executor = self._executor
+            self._executor = ThreadPoolExecutor(max_workers=self._config.max_workers)
+
+        if old_executor:
             try:
                 import sys
                 if sys.version_info >= (3, 9):
-                    self._executor.shutdown(wait=False, cancel_futures=True)
+                    old_executor.shutdown(wait=False, cancel_futures=True)
                 else:
-                    self._executor.shutdown(wait=False)
+                    old_executor.shutdown(wait=False)
             except (RuntimeError, TypeError):
                 pass
-        self._executor = ThreadPoolExecutor(max_workers=self._config.max_workers)
 
     def update_config(self, config: AppConfig) -> None:
         """Обновление конфигурации"""
@@ -118,11 +123,12 @@ class MonitorThread(QThread):
     def stop(self) -> None:
         self._running = False
         self._paused = False
-        if self._executor:
-            try:
-                self._executor.shutdown(wait=True)
-            except RuntimeError:
-                pass
+        with self._executor_lock:
+            if self._executor:
+                try:
+                    self._executor.shutdown(wait=False)
+                except RuntimeError:
+                    pass
         self.wait()
 
     def _check_host(self, host: Host) -> Tuple[str, str, Optional[str]]:
@@ -174,8 +180,14 @@ class MonitorThread(QThread):
                     for host in hosts:
                         if not self._running:
                             break
-                        future = self._executor.submit(self._check_host, host)
-                        futures[future] = host
+                        try:
+                            with self._executor_lock:
+                                if not self._running:
+                                    break
+                                future = self._executor.submit(self._check_host, host)
+                            futures[future] = host
+                        except RuntimeError as e:
+                            logging.warning(f"MonitorThread submit failed: {e}")
 
                     newly_offline = []
                     newly_recovered = []
@@ -262,6 +274,15 @@ class MonitorThread(QThread):
         except Exception as e:
              logging.error(f"Critical MonitorThread error (setup): {e}")
              self.error_occurred.emit(f"Critical MonitorThread error: {e}")
+        finally:
+            if QSqlDatabase.contains(connection_name):
+                try:
+                    thread_db = QSqlDatabase.database(connection_name)
+                    if thread_db.isOpen():
+                        thread_db.close()
+                except Exception:
+                    pass
+                QSqlDatabase.removeDatabase(connection_name)
 
     def _calculate_status(self, host: Host, ping_status: str, current_time: datetime) -> Tuple[str, Optional[str], bool]:
         """

@@ -146,10 +146,10 @@ class TestStorageManager(unittest.TestCase):
         with open("hosts.json", "w") as f:
             json.dump(data, f)
         
-        # Load - validation is lenient, all hosts load
+        # Load - invalid entry is skipped, only valid hosts load
         hosts = self.storage.load_hosts()
         
-        self.assertEqual(len(hosts), 3)  # All 3 hosts loaded
+        self.assertEqual(len(hosts), 2)  # 2 valid hosts loaded (invalid 999.999.999.999 skipped)
     
     def test_migrate_to_db(self):
         """Test migration from JSON to database."""

@@ -26,15 +26,19 @@ def validate_ip_or_hostname(address: str) -> bool:
     if validate_ip(address):
         return True
     
-    # Проверка доменного имени (RFC 1035)
-    # Базовая проверка формата hostname
-    hostname_pattern = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$', re.IGNORECASE)
-    
     # Разделение на части по точкам
     parts = address.split('.')
     
     if len(parts) < 2 or len(parts) > 127:
         return False
+
+    # Если адрес состоит только из цифр во всех октетах или TLD состоит только из цифр,
+    # это не может быть валидным доменным именем (RFC 3696 / RFC 1123)
+    if all(part.isdigit() for part in parts) or parts[-1].isdigit():
+        return False
+    
+    # Проверка доменного имени (RFC 1035 / RFC 1123)
+    hostname_pattern = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$', re.IGNORECASE)
     
     # Проверка каждой части
     for part in parts:

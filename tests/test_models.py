@@ -152,11 +152,14 @@ class TestHostModel(unittest.TestCase):
         host = Host(name="Web", ip="google.com")
         self.assertEqual(host.ip, "google.com")
     
-    @unittest.skip("IP validation is lenient - allows some invalid IPs")
     def test_invalid_ip(self):
         """Test that invalid IP raises error."""
         with self.assertRaises(ValueError):
             Host(name="Server", ip="999.999.999.999")
+        with self.assertRaises(ValueError):
+            Host(name="Server", ip="256.1.1.1")
+        with self.assertRaises(ValueError):
+            Host(name="Server", ip="1.2.3.4.5")
     
     def test_invalid_hostname(self):
         """Test that invalid hostname raises error."""

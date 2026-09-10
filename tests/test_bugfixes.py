@@ -321,5 +321,31 @@ class TestHelpdeskServiceArgs(unittest.TestCase):
         HelpdeskService.process_recovered(["test_host"], config)
 
 
+class TestTableSortWithHostnames(unittest.TestCase):
+    """Регрессия: сортировка по колонке IP падала с TypeError при наличии доменных имен."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def test_sort_ip_column_with_mixed_ipv4_and_hostname(self):
+        model = HostTableModel()
+        h1 = _make_host(id='1', name='H1', ip='192.168.1.10')
+        h2 = _make_host(id='2', name='H2', ip='router.local')
+        h3 = _make_host(id='3', name='H3', ip='10.0.0.1')
+        h4 = _make_host(id='4', name='H4', ip='api.corp.net')
+        model.set_hosts([h1, h2, h3, h4])
+
+        # Не должно вызывать TypeError: '<' not supported between instances of 'list' and 'str'
+        model.sort(2, Qt.AscendingOrder)
+        hosts_asc = [model.get_host(i).ip for i in range(model.rowCount())]
+        self.assertEqual(len(hosts_asc), 4)
+
+        model.sort(2, Qt.DescendingOrder)
+        hosts_desc = [model.get_host(i).ip for i in range(model.rowCount())]
+        self.assertEqual(len(hosts_desc), 4)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+

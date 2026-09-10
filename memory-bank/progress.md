@@ -58,6 +58,13 @@
 - Неиспользуемая библиотека `plyer` в requirements.txt (заменена на QSystemTrayIcon)
 
 ## Последнее обновление memory-bank
+2026-09-10 — Устранение критических сбоев ядра (Приоритет 1 аудита):
+- Устранён критический краш `TypeError` при сортировке таблицы по колонке «IP адрес» при наличии хостов с доменными именами (`table_model.py`).
+- Защищён доступ к `ThreadPoolExecutor` в `MonitorThread` через `threading.Lock` при динамическом обновлении конфигурации (`update_config`), устранена утечка именованного SQLite-подключения потока (`monitor_thread.py`).
+- Добавлен таймаут (`timeout + 2.0`) и перехват `subprocess.TimeoutExpired` для `subprocess.run` в `PingService._system_ping` для предотвращения зависания воркеров (`services.py`).
+- Исправлена валидация IP/доменных имен в `models.py` (блокировка некорректных 4-октетных чисел и числовых TLD), расконсервирован тест `test_invalid_ip`.
+- Тестовый набор расширен до 157 тестов (151 passed, 6 skipped).
+
 2026-09-10 — актуализация по результатам Drift Detection:
 - Зафиксирована поддержка темы Tactical (NOC Terminal) в UI и designSystem.
 - Зафиксирована система миграций schema_version в SQLite (закрыт техдолг).
