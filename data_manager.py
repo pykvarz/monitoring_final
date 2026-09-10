@@ -62,24 +62,52 @@ class DataManager(QObject):
     def get_hosts_by_group(self, group: str) -> List[Host]:
         """Получение хостов по группе (SQL-фильтрация на стороне БД)"""
         hosts = []
-        if not self.db_manager.get_db().isOpen():
+        db = self.db_manager.get_db()
+        if not db.isOpen():
             return hosts
 
-        query = QSqlQuery()
+        query = QSqlQuery(db)
         query.prepare("SELECT * FROM hosts WHERE grp = :group ORDER BY status, name")
         query.bindValue(":group", group)
         if query.exec_():
             while query.next():
                 hosts.append(self._record_to_host(query))
-            query.finish()
         else:
             logging.error(f"Ошибка фильтрации по группе '{group}': {query.lastError().text()}")
+        query.finish()
 
         return hosts
 
+    def exists_by_ip(self, ip: str, exclude_id: Optional[str] = None) -> bool:
+        """Проверка существования хоста с данным IP/хостнеймом в БД"""
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return False
+
+        query = QSqlQuery(db)
+        if exclude_id:
+            query.prepare("SELECT 1 FROM hosts WHERE ip = :ip AND id != :exclude_id LIMIT 1")
+            query.bindValue(":exclude_id", exclude_id)
+        else:
+            query.prepare("SELECT 1 FROM hosts WHERE ip = :ip LIMIT 1")
+        query.bindValue(":ip", ip.strip())
+        
+        exists = False
+        if query.exec_():
+            if query.next():
+                exists = True
+            query.finish()
+        else:
+            logging.error(f"Ошибка проверки существования IP {ip}: {query.lastError().text()}")
+        return exists
+
     def add_host(self, host: Host) -> bool:
         """Добавление нового хоста"""
-        query = QSqlQuery()
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return False
+
+        query = QSqlQuery(db)
         query.prepare("""
             INSERT INTO hosts (id, ip, name, address, grp, status, notifications_enabled)
             VALUES (:id, :ip, :name, :address, :grp, :status, :notifications_enabled)
@@ -92,14 +120,18 @@ class DataManager(QObject):
         query.bindValue(":status", host.status)
         query.bindValue(":notifications_enabled", 1 if host.notifications_enabled else 0)
         
-        if query.exec_():
+        success = query.exec_()
+        if success:
+            query.finish()
             # Эмитим детальное событие
             self.host_added.emit(host)
             # Затем общее обновление UI
             self._trigger_update()
             return True
         else:
-            logging.error(f"Ошибка добавления хоста: {query.lastError().text()}")
+            err = query.lastError().text()
+            query.finish()
+            logging.error(f"Ошибка добавления хоста: {err}")
             return False
 
     def add_hosts(self, hosts: List[Host]) -> Tuple[int, int]:
@@ -136,6 +168,7 @@ class DataManager(QObject):
                 logging.warning(f"Failed to add host {host.name}: {query.lastError().text()}")
                 errors += 1
                 
+        query.finish()
         if not db.commit():
             logging.error("Failed to commit batch add transaction")
             db.rollback()
@@ -154,11 +187,17 @@ class DataManager(QObject):
         if hosts:
             old_host = hosts[0]
         
-        query = QSqlQuery()
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return False
+
+        query = QSqlQuery(db)
         query.prepare("DELETE FROM hosts WHERE id = :id")
         query.bindValue(":id", host_id)
         
-        if query.exec_():
+        success = query.exec_()
+        query.finish()
+        if success:
             # Эмитим детальное событие
             if old_host:
                 self.host_deleted.emit(host_id, old_host)
@@ -172,17 +211,22 @@ class DataManager(QObject):
         Обновление статуса хоста.
         Если статус реально меняется — пишем событие в журнал истории (status_history).
         """
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return
+
         # Узнаём текущий (старый) статус и имя хоста — нужно и для проверки
         # "изменился ли статус", и для журнала (имя хранится отдельно на случай
         # удаления/переименования узла в будущем — история должна остаться читаемой)
         old_status = None
         host_name = host_id
-        lookup = QSqlQuery()
+        lookup = QSqlQuery(db)
         lookup.prepare("SELECT status, name FROM hosts WHERE id = :id")
         lookup.bindValue(":id", host_id)
         if lookup.exec_() and lookup.next():
             old_status = lookup.value("status")
             host_name = lookup.value("name") or host_id
+        lookup.finish()
 
         # Примечание: offline_since НЕ обнуляется принудительно при status=ONLINE.
         # Статус-машина (MonitorThread._calculate_status) осознанно передаёт
@@ -190,7 +234,7 @@ class DataManager(QObject):
         # (порог waiting_timeout не достигнут). При реальном восстановлении
         # (ping OK) статус-машина сама передаёт offline_since=None.
 
-        query = QSqlQuery()
+        query = QSqlQuery(db)
         
         # Обновляем status, last_seen и offline_since.
         # last_seen обновляется только когда узел реально ONLINE (offline_since is None),
@@ -221,6 +265,7 @@ class DataManager(QObject):
             query.bindValue(":id", host_id)
         
         if query.exec_():
+            query.finish()
             if old_status is not None and old_status != status:
                 self._add_history_event(host_id, host_name, old_status, status)
 
@@ -230,11 +275,17 @@ class DataManager(QObject):
                 if not self._update_timer.isActive():
                     self._update_timer.start()
         else:
-            logging.error(f"Failed to update host {host_id}: {query.lastError().text()}")
+            err = query.lastError().text()
+            query.finish()
+            logging.error(f"Failed to update host {host_id}: {err}")
 
     def _add_history_event(self, host_id: str, host_name: str, old_status: str, new_status: str) -> None:
         """Запись события смены статуса в журнал истории"""
-        query = QSqlQuery()
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return
+
+        query = QSqlQuery(db)
         query.prepare("""
             INSERT INTO status_history (host_id, host_name, old_status, new_status, timestamp)
             VALUES (:host_id, :host_name, :old_status, :new_status, :timestamp)
@@ -246,11 +297,16 @@ class DataManager(QObject):
         query.bindValue(":timestamp", datetime.now(timezone.utc).isoformat())
         if not query.exec_():
             logging.warning(f"Не удалось записать событие истории для {host_id}: {query.lastError().text()}")
+        query.finish()
 
     def get_host_history(self, host_id: str, limit: int = 200) -> List[Dict]:
         """История смены статусов конкретного узла (для правой панели)"""
         events = []
-        query = QSqlQuery()
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return events
+
+        query = QSqlQuery(db)
         query.prepare("""
             SELECT old_status, new_status, timestamp FROM status_history
             WHERE host_id = :host_id
@@ -266,19 +322,29 @@ class DataManager(QObject):
                     "new_status": query.value("new_status"),
                     "timestamp": query.value("timestamp"),
                 })
-            query.finish()
+        else:
+            logging.error(f"Ошибка чтения истории узла {host_id}: {query.lastError().text()}")
+        query.finish()
         return events
 
     def clear_host_history(self, host_id: str) -> bool:
         """Очистка истории для конкретного узла"""
-        query = QSqlQuery()
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return False
+
+        query = QSqlQuery(db)
         query.prepare("DELETE FROM status_history WHERE host_id = :host_id")
         query.bindValue(":host_id", host_id)
-        if query.exec_():
+        success = query.exec_()
+        if success:
+            query.finish()
             logging.info(f"История для узла {host_id} очищена")
             return True
         else:
-            logging.error(f"Ошибка очистки истории узла {host_id}: {query.lastError().text()}")
+            err = query.lastError().text()
+            query.finish()
+            logging.error(f"Ошибка очистки истории узла {host_id}: {err}")
             return False
 
     def get_history_events(self, limit: int = 500, host_name_filter: str = None,
@@ -289,6 +355,10 @@ class DataManager(QObject):
         (группа могла с тех пор смениться — фильтруем по актуальной).
         """
         events = []
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return events
+
         sql = """
             SELECT h.host_id, h.host_name, h.old_status, h.new_status, h.timestamp,
                    hosts.grp AS grp, hosts.ip AS ip, hosts.address AS address
@@ -309,7 +379,7 @@ class DataManager(QObject):
 
         sql += " ORDER BY h.timestamp DESC LIMIT :limit"
 
-        query = QSqlQuery()
+        query = QSqlQuery(db)
         query.prepare(sql)
         for key, value in params.items():
             query.bindValue(key, value)
@@ -329,6 +399,7 @@ class DataManager(QObject):
                 })
         else:
             logging.error(f"Ошибка чтения журнала истории: {query.lastError().text()}")
+        query.finish()
         return events
 
     def purge_old_history(self, retention_days: int) -> int:
@@ -340,27 +411,41 @@ class DataManager(QObject):
         if not retention_days or retention_days <= 0:
             return 0
 
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return 0
+
         cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).isoformat()
-        query = QSqlQuery()
+        query = QSqlQuery(db)
         query.prepare("DELETE FROM status_history WHERE timestamp < :cutoff")
         query.bindValue(":cutoff", cutoff)
         if query.exec_():
             deleted = query.numRowsAffected()
+            query.finish()
             if deleted > 0:
                 logging.info(f"Очистка истории: удалено {deleted} событий старше {retention_days} дней")
             return deleted
         else:
-            logging.error(f"Ошибка очистки истории: {query.lastError().text()}")
+            err = query.lastError().text()
+            query.finish()
+            logging.error(f"Ошибка очистки истории: {err}")
             return 0
 
     def clear_history(self) -> bool:
         """Полная очистка журнала событий"""
-        query = QSqlQuery()
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return False
+
+        query = QSqlQuery(db)
         if query.exec_("DELETE FROM status_history"):
+            query.finish()
             logging.info("Журнал истории событий полностью очищен")
             return True
         else:
-            logging.error(f"Ошибка полной очистки истории: {query.lastError().text()}")
+            err = query.lastError().text()
+            query.finish()
+            logging.error(f"Ошибка полной очистки истории: {err}")
             return False
 
     def update_host_info(self, host: Host) -> bool:
@@ -371,7 +456,11 @@ class DataManager(QObject):
         if hosts:
             old_host = hosts[0]
         
-        query = QSqlQuery()
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return False
+
+        query = QSqlQuery(db)
         query.prepare("""
             UPDATE hosts 
             SET ip = :ip, 
@@ -388,7 +477,9 @@ class DataManager(QObject):
         query.bindValue(":notifications_enabled", 1 if host.notifications_enabled else 0)
         query.bindValue(":id", host.id)
         
-        if query.exec_():
+        success = query.exec_()
+        if success:
+            query.finish()
             # Эмитим детальное событие
             if old_host:
                 self.host_info_updated.emit(host.id, old_host, host)
@@ -396,7 +487,9 @@ class DataManager(QObject):
             self._trigger_update()
             return True
         else:
-            logging.error(f"Ошибка обновления информации хоста {host.id}: {query.lastError().text()}")
+            err = query.lastError().text()
+            query.finish()
+            logging.error(f"Ошибка обновления информации хоста {host.id}: {err}")
             return False
 
     def _trigger_update(self, host_ids: List[str] = None):
@@ -422,12 +515,13 @@ class DataManager(QObject):
 
     def get_hosts_by_ids(self, host_ids: List[str]) -> List[Host]:
         """Получение списка хостов по ID"""
-        if not host_ids or not self.db_manager.get_db().isOpen():
+        db = self.db_manager.get_db()
+        if not host_ids or not db.isOpen():
             return []
             
         hosts = []
         placeholders = ",".join(["?"] * len(host_ids))
-        query = QSqlQuery()
+        query = QSqlQuery(db)
         query.prepare(f"SELECT * FROM hosts WHERE id IN ({placeholders})")
         
         for host_id in host_ids:
@@ -436,7 +530,9 @@ class DataManager(QObject):
         if query.exec_():
             while query.next():
                 hosts.append(self._record_to_host(query))
-            query.finish()
+        else:
+            logging.error(f"Ошибка получения хостов по IDs: {query.lastError().text()}")
+        query.finish()
                 
         return hosts
 
@@ -467,16 +563,19 @@ class DataManager(QObject):
         """Получение статистики по статусам"""
         stats = {"ONLINE": 0, "WAITING": 0, "OFFLINE": 0, "MAINTENANCE": 0, "TOTAL": 0}
         
-        if not self.db_manager.get_db().isOpen():
+        db = self.db_manager.get_db()
+        if not db.isOpen():
             return stats
             
-        query = QSqlQuery("SELECT status, COUNT(*) FROM hosts GROUP BY status")
+        query = QSqlQuery("SELECT status, COUNT(*) FROM hosts GROUP BY status", db)
         while query.next():
             status = query.value(0)
             count = query.value(1)
             if status in stats:
                 stats[status] = count
             stats["TOTAL"] += count
+        query.finish()
             
         return stats
+
 

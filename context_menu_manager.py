@@ -200,19 +200,19 @@ class ContextMenuManager:
         if not host:
             return
         
-        if not validate_ip_or_hostname(host.ip):
-            QMessageBox.warning(self._parent, "Ошибка", f"Некорректный IP адрес: {host.ip}")
-            return
-
         self._ping_cmd(host.ip)
 
     def _ping_cmd(self, ip: str, label: str = None):
         """Открытие CMD/терминала с ping -t по произвольному IP (используется и для Cisco)"""
+        if not ip or not validate_ip_or_hostname(ip):
+            QMessageBox.warning(self._parent, "Ошибка", f"Некорректный IP адрес: {ip}")
+            return
+
         try:
             if sys.platform == "win32":
                 subprocess.Popen(['cmd', '/c', 'start', 'cmd', '/k', 'ping', '-t', ip])
             else:
-                subprocess.Popen(['xterm', '-e', f'ping {ip}'])
+                subprocess.Popen(['xterm', '-e', 'ping', ip])
         except Exception as e:
             QMessageBox.warning(self._parent, "Ошибка", f"Не удалось открыть терминал: {e}")
 

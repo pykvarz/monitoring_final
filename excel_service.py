@@ -92,6 +92,17 @@ class ExcelService:
         return new_hosts, skipped_count, errors
 
     @staticmethod
+    def sanitize_cell_value(val: any) -> any:
+        """
+        Предотвращает Formula Injection (CWE-1236) при экспорте в Excel.
+        Если строковое значение начинается с '=', '+', '-', '@', '\t', '\r',
+        экранирует его ведущим апострофом.
+        """
+        if isinstance(val, str) and val and val[0] in ('=', '+', '-', '@', '\t', '\r'):
+            return "'" + val
+        return val
+
+    @staticmethod
     def export_hosts(file_path: str, hosts: List[Host]) -> None:
         """Экспорт хостов в Excel"""
         try:
@@ -142,10 +153,10 @@ class ExcelService:
                 notifications = "Вкл" if host.notifications_enabled else "Выкл"
 
                 row_data = [
-                    host.name,
-                    host.ip,
-                    host.address,
-                    host.group,
+                    ExcelService.sanitize_cell_value(host.name),
+                    ExcelService.sanitize_cell_value(host.ip),
+                    ExcelService.sanitize_cell_value(host.address),
+                    ExcelService.sanitize_cell_value(host.group),
                     status_name,
                     last_seen,
                     offline_since,
@@ -222,10 +233,10 @@ class ExcelService:
                 new_s = status_titles.get(ev.get("new_status"), ev.get("new_status") or "—")
 
                 row_data = [
-                    ts_formatted,
-                    new_s,
-                    old_s,
-                    new_s
+                    ExcelService.sanitize_cell_value(ts_formatted),
+                    ExcelService.sanitize_cell_value(new_s),
+                    ExcelService.sanitize_cell_value(old_s),
+                    ExcelService.sanitize_cell_value(new_s)
                 ]
                 sheet.append(row_data)
 

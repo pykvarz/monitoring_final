@@ -39,7 +39,7 @@ class DatabaseManager:
         if not self._connected:
             return
 
-        query = QSqlQuery()
+        query = QSqlQuery(self.db)
         
         # Write-Ahead Logging - значительно ускоряет запись и позволяет параллельное чтение
         if not query.exec_("PRAGMA journal_mode = WAL"):
@@ -55,6 +55,7 @@ class DatabaseManager:
         
         # Увеличение размера кэша страниц (по умолчанию обычно 2000, ставим 10000)
         query.exec_("PRAGMA cache_size = 10000")
+        query.finish()
 
         logging.info("Оптимизации базы данных применены")
 
@@ -63,7 +64,7 @@ class DatabaseManager:
         if not self._connected:
             return
 
-        query = QSqlQuery()
+        query = QSqlQuery(self.db)
         
         # Таблица хостов
         # Используем status_idx для быстрого поиска по статусу
@@ -116,6 +117,7 @@ class DatabaseManager:
         # Индексы для истории: по узлу (панель истории узла) и по времени (общий журнал/очистка)
         query.exec_("CREATE INDEX IF NOT EXISTS idx_history_host_id ON status_history(host_id)")
         query.exec_("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON status_history(timestamp)")
+        query.finish()
 
         logging.info("Структура таблиц проверена/создана")
 
@@ -124,7 +126,7 @@ class DatabaseManager:
         if not self._connected:
             return
 
-        query = QSqlQuery()
+        query = QSqlQuery(self.db)
         schema_table = """
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER PRIMARY KEY,
@@ -133,6 +135,7 @@ class DatabaseManager:
         """
         if not query.exec_(schema_table):
             logging.error(f"Ошибка создания таблицы schema_version: {query.lastError().text()}")
+            query.finish()
             return
 
         current_version = 0
@@ -143,6 +146,7 @@ class DatabaseManager:
                     current_version = int(val)
                 except (ValueError, TypeError):
                     current_version = 0
+        query.finish()
 
         migrations = [
             (1, self._migration_add_address_column),
@@ -153,12 +157,14 @@ class DatabaseManager:
                 logging.info(f"Применение миграции БД v{ver}...")
                 try:
                     if migration_fn():
-                        record_query = QSqlQuery()
+                        record_query = QSqlQuery(self.db)
                         record_query.prepare("INSERT INTO schema_version (version) VALUES (:version)")
                         record_query.bindValue(":version", ver)
                         if not record_query.exec_():
                             logging.error(f"Не удалось зафиксировать версию миграции v{ver}: {record_query.lastError().text()}")
+                            record_query.finish()
                             break
+                        record_query.finish()
                         logging.info(f"Миграция БД v{ver} успешно применена")
                     else:
                         logging.error(f"Миграция v{ver} завершилась неудачей")
@@ -169,7 +175,7 @@ class DatabaseManager:
 
     def _migration_add_address_column(self) -> bool:
         """Миграция v1: Добавление колонки address в таблицу hosts, если её нет"""
-        query = QSqlQuery()
+        query = QSqlQuery(self.db)
         query.exec_("PRAGMA table_info(hosts)")
         cols = []
         while query.next():
@@ -177,7 +183,9 @@ class DatabaseManager:
         if "address" not in cols:
             if not query.exec_("ALTER TABLE hosts ADD COLUMN address TEXT DEFAULT ''"):
                 logging.error(f"Ошибка добавления колонки address: {query.lastError().text()}")
+                query.finish()
                 return False
+        query.finish()
         return True
 
     def get_db(self) -> QSqlDatabase:

@@ -137,13 +137,17 @@ class PingService(IPingService):
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE,
                 creationflags=creationflags,
-                text=True
+                text=True,
+                timeout=timeout + 2.0
             )
             # Windows ping returns 0 even on "Request timed out". 
             # We must check for "TTL=" (English) or "TTL=" (Russian) to confirm a real reply.
             output = result.stdout.upper()
             if result.returncode == 0 and "TTL=" in output:
                 return True
+            return False
+        except subprocess.TimeoutExpired:
+            logging.debug(f"Таймаут системного ping для {host}")
             return False
         except Exception:
             return False

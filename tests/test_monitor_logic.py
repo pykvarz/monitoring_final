@@ -144,5 +144,18 @@ class TestMonitorLogic(unittest.TestCase):
         self.assertEqual(os3, os1, "offline_since должен сохранять исходное время начала сбоя!")
         self.assertTrue(up3)
 
+    def test_executor_lock_protects_update_config(self):
+        """Проверка наличия блокировки для потокобезопасного обновления executor."""
+        self.assertTrue(hasattr(self.thread, '_executor_lock'),
+                        "MonitorThread must have _executor_lock for thread-safe executor updates")
+        
+        # Test updating config with different max_workers
+        new_config = MagicMock()
+        new_config.max_workers = 10
+        self.thread.update_config(new_config)
+        self.assertEqual(self.thread._config.max_workers, 10)
+        self.assertIsNotNone(self.thread._executor)
+
+
 if __name__ == '__main__':
     unittest.main()
