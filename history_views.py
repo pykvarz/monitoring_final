@@ -275,18 +275,7 @@ class EventLogPanel(QFrame):
         self._list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_list_context_menu)
-        self._list.setStyleSheet("""
-            QListWidget {
-                background-color: transparent;
-                border: none;
-                outline: none;
-            }
-            QListWidget::item {
-                background-color: transparent;
-                border: none;
-                padding: 4px 0px;
-            }
-        """)
+        self._list.setStyleSheet(self._get_list_style(self._theme))
         layout.addWidget(self._list, 1)
 
         self._summary_label = QLabel("")
@@ -427,7 +416,59 @@ class EventLogPanel(QFrame):
             """)
         if hasattr(self, '_status_combo') and self._status_combo:
             self._status_combo.setStyleSheet(get_combobox_style(theme))
+        if hasattr(self, '_list') and self._list:
+            self._list.setStyleSheet(self._get_list_style(theme))
         self.refresh()
+
+    @staticmethod
+    def _get_list_style(theme: str) -> str:
+        is_dark = theme in ("dark", "tactical")
+        if theme == "tactical":
+            bg = "#090A0F"
+            handle = "#1F232D"
+            hover = "#64748B"
+        elif is_dark:
+            bg = "#181c26"
+            handle = "#282e3d"
+            hover = "#3b82f6"
+        else:
+            bg = "#f8fafc"
+            handle = "#cbd5e1"
+            hover = "#94a3b8"
+
+        return f"""
+            QListWidget {{
+                background-color: transparent;
+                border: none;
+                outline: none;
+            }}
+            QListWidget::item {{
+                background-color: transparent;
+                border: none;
+                padding: 4px 0px;
+            }}
+            QScrollBar:vertical {{
+                background-color: {bg};
+                width: 8px;
+                margin: 0px;
+                border: none;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {handle};
+                min-height: 24px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: {hover};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+                border: none;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: none;
+            }}
+        """
 
 
 class HistoryDialog(QDialog):

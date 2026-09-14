@@ -352,6 +352,48 @@ def get_main_style(theme="dark"):
             font-size: 11px;
             font-family: {font_family};
         }}
+        QScrollBar:vertical {{
+            background-color: {TACTICAL_BG};
+            width: 8px;
+            margin: 0px;
+            border: none;
+        }}
+        QScrollBar::handle:vertical {{
+            background-color: {TACTICAL_BORDER};
+            min-height: 20px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background-color: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            height: 0px;
+            border: none;
+        }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+            background: none;
+        }}
+        QScrollBar:horizontal {{
+            background-color: {TACTICAL_BG};
+            height: 8px;
+            margin: 0px;
+            border: none;
+        }}
+        QScrollBar::handle:horizontal {{
+            background-color: {TACTICAL_BORDER};
+            min-width: 20px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:horizontal:hover {{
+            background-color: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+            width: 0px;
+            border: none;
+        }}
+        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+            background: none;
+        }}
         """
     font_family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
     return f"""
