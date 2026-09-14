@@ -194,7 +194,7 @@ class ThemeManager:
                 sep.setStyleSheet("color: #282e3d; max-height: 20px; margin: 4px 4px;")
 
         if hasattr(self._window, '_group_filter') and self._window._group_filter:
-            self._window._group_filter.setStyleSheet(get_combobox_style())
+            self._window._group_filter.setStyleSheet(get_combobox_style(theme))
         if hasattr(self._window, '_search_edit') and self._window._search_edit:
             self._window._search_edit.setStyleSheet("""
                 QLineEdit {

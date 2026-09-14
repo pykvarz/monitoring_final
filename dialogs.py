@@ -16,6 +16,7 @@ from PyQt5.QtCore import Qt, QByteArray
 from models import Host, AppConfig, validate_ip_or_hostname
 from constants import get_svg_add_host, get_svg_settings, get_main_style, get_combobox_style
 from theme_manager import set_dark_titlebar
+from ui_components import UIComponents
 
 
 class HostDialog(QDialog):
@@ -68,7 +69,7 @@ class HostDialog(QDialog):
         self._address_edit.setMaxLength(150)
 
         self._group_combo = QComboBox()
-        self._group_combo.setStyleSheet(get_combobox_style(self._theme))
+        UIComponents.setup_combobox(self._group_combo, self._theme)
         self._group_combo.setEditable(True)
         self._group_combo.lineEdit().setMaxLength(50) # Лимит на название группы
         self._group_combo.addItems(self._groups)
@@ -294,6 +295,7 @@ class SettingsDialog(QDialog):
         appearance_layout.setLabelAlignment(Qt.AlignRight)
         
         self._theme_combo = QComboBox()
+        UIComponents.setup_combobox(self._theme_combo, self._theme)
         self._theme_combo.addItem("Dark", "dark")
         self._theme_combo.addItem("Tactical NOC", "tactical")
         idx = self._theme_combo.findData(self._theme)

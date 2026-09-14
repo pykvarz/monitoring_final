@@ -113,3 +113,8 @@
 - В NotificationService добавлен параметр show_tray (по умолчанию True для тестов). При показе ToastManager дублирующий системный трей-баннер Windows отключается, звуковой сигнал сохраняется.
 - В MainWindow.closeEvent подключен close_all() для мгновенного закрытия активных карточек.
 - Тестовый набор расширен до 176 тестов (170 passed, 6 skipped).
+
+2026-09-14 — исправление выпадающих списков (QComboBox):
+- Устранены белые полосы сверху/снизу и системные артефакты Windows: вызовы combo.setView(QListView()) в UIComponents.setup_combobox отключают нативный QComboBoxPrivateContainer.
+- В constants.py обновлен get_combobox_style для тем Dark и Tactical NOC: добавлены стилизованный QListView, CSS-стрелка down-arrow, скругления, отступы, подсветка при фокусе и кастомный тонкий скроллбар.
+- Единая стилизация применена ко всем комбобоксам приложения: фильтр групп в тулбаре, выбор статуса в EventLogPanel, выбор группы и статуса в HistoryDialog, группа в HostDialog и выбор темы в SettingsDialog.

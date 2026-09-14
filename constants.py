@@ -394,6 +394,7 @@ def get_main_style(theme="dark"):
         QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
             background: none;
         }}
+        {get_combobox_style("tactical")}
         """
     font_family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
     return f"""
@@ -449,26 +450,6 @@ def get_main_style(theme="dark"):
             height: 1px;
             background-color: {DARK_BORDER};
             margin: 4px 8px;
-        }}
-        QComboBox QAbstractItemView {{
-            background-color: {DARK_SURFACE};
-            color: {DARK_TEXT};
-            border: 1px solid {DARK_BORDER};
-            border-radius: 6px;
-            selection-background-color: {DARK_SELECTION};
-            selection-color: #ffffff;
-            padding: 4px;
-            outline: none;
-        }}
-        QComboBox QAbstractItemView::item {{
-            min-height: 24px;
-            padding: 3px 8px;
-            color: {DARK_TEXT};
-        }}
-        QComboBox QAbstractItemView::item:hover,
-        QComboBox QAbstractItemView::item:selected {{
-            background-color: {DARK_SELECTION};
-            color: #ffffff;
         }}
         QLineEdit, QSpinBox {{
             background-color: #1c202a;
@@ -567,6 +548,7 @@ def get_main_style(theme="dark"):
         QSplitter::handle:hover {{
             background-color: #3b82f6;
         }}
+        {get_combobox_style(theme)}
     """
 
 def get_menubar_style(theme="dark"):
@@ -597,81 +579,168 @@ def get_combobox_style(theme="dark"):
         return f"""
         QComboBox {{
             border: 1px solid {TACTICAL_BORDER};
-            border-radius: 0px;
-            padding: 3px 10px;
+            border-radius: 2px;
+            padding: 4px 24px 4px 10px;
             background-color: {TACTICAL_SURFACE};
             color: {TACTICAL_TEXT};
             font-size: 12px;
             font-family: Consolas, "Courier New", monospace;
+            min-height: 20px;
         }}
         QComboBox:hover {{
             border-color: {TACTICAL_TEXT_SECONDARY};
         }}
+        QComboBox:focus {{
+            border-color: #00F0FF;
+        }}
         QComboBox::drop-down {{
             subcontrol-origin: padding;
             subcontrol-position: top right;
-            width: 20px;
+            width: 22px;
             border: none;
+            background: transparent;
         }}
-        QComboBox QAbstractItemView {{
+        QComboBox::down-arrow {{
+            image: none;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid {TACTICAL_TEXT_SECONDARY};
+            width: 0px;
+            height: 0px;
+            margin-right: 6px;
+        }}
+        QComboBox::down-arrow:hover {{
+            border-top-color: #00F0FF;
+        }}
+        QComboBox QAbstractItemView,
+        QComboBox QListView {{
             background-color: {TACTICAL_SURFACE};
             color: {TACTICAL_TEXT};
             border: 1px solid {TACTICAL_BORDER};
-            border-radius: 0px;
+            border-radius: 2px;
             selection-background-color: {TACTICAL_SELECTION};
             selection-color: {TACTICAL_ONLINE};
-            padding: 4px;
-            outline: none;
+            padding: 2px;
+            outline: 0px;
+            margin: 0px;
             font-family: Consolas, "Courier New", monospace;
         }}
-        QComboBox QAbstractItemView::item {{
+        QComboBox QAbstractItemView::item,
+        QComboBox QListView::item {{
             min-height: 24px;
-            padding: 3px 8px;
+            padding: 4px 8px;
             color: {TACTICAL_TEXT};
+            background-color: transparent;
         }}
         QComboBox QAbstractItemView::item:hover,
-        QComboBox QAbstractItemView::item:selected {{
+        QComboBox QAbstractItemView::item:selected,
+        QComboBox QListView::item:hover,
+        QComboBox QListView::item:selected {{
             background-color: {TACTICAL_SELECTION};
             color: {TACTICAL_ONLINE};
+        }}
+        QComboBox QAbstractItemView QScrollBar:vertical,
+        QComboBox QListView QScrollBar:vertical {{
+            background: {TACTICAL_BG};
+            width: 6px;
+            margin: 0px;
+            border: none;
+        }}
+        QComboBox QAbstractItemView QScrollBar::handle:vertical,
+        QComboBox QListView QScrollBar::handle:vertical {{
+            background: {TACTICAL_BORDER};
+            min-height: 16px;
+            border-radius: 3px;
+        }}
+        QComboBox QAbstractItemView QScrollBar::add-line:vertical,
+        QComboBox QAbstractItemView QScrollBar::sub-line:vertical,
+        QComboBox QListView QScrollBar::add-line:vertical,
+        QComboBox QListView QScrollBar::sub-line:vertical {{
+            height: 0px;
+            border: none;
         }}
         """
     return f"""
         QComboBox {{
             border: 1px solid {DARK_BORDER};
             border-radius: 6px;
-            padding: 3px 10px;
+            padding: 4px 24px 4px 10px;
             background-color: {DARK_SURFACE};
             color: {DARK_TEXT};
             font-size: 12px;
+            min-height: 20px;
         }}
         QComboBox:hover {{
             border-color: #3b82f6;
         }}
+        QComboBox:focus {{
+            border-color: #60a5fa;
+        }}
         QComboBox::drop-down {{
             subcontrol-origin: padding;
             subcontrol-position: top right;
-            width: 20px;
+            width: 22px;
             border: none;
+            background: transparent;
         }}
-        QComboBox QAbstractItemView {{
+        QComboBox::down-arrow {{
+            image: none;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid {DARK_TEXT_SECONDARY};
+            width: 0px;
+            height: 0px;
+            margin-right: 6px;
+        }}
+        QComboBox::down-arrow:hover {{
+            border-top-color: #3b82f6;
+        }}
+        QComboBox QAbstractItemView,
+        QComboBox QListView {{
             background-color: {DARK_SURFACE};
             color: {DARK_TEXT};
             border: 1px solid {DARK_BORDER};
             border-radius: 6px;
             selection-background-color: {DARK_SELECTION};
             selection-color: #ffffff;
-            padding: 4px;
-            outline: none;
+            padding: 2px;
+            outline: 0px;
+            margin: 0px;
         }}
-        QComboBox QAbstractItemView::item {{
+        QComboBox QAbstractItemView::item,
+        QComboBox QListView::item {{
             min-height: 24px;
-            padding: 3px 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
             color: {DARK_TEXT};
+            background-color: transparent;
         }}
         QComboBox QAbstractItemView::item:hover,
-        QComboBox QAbstractItemView::item:selected {{
+        QComboBox QAbstractItemView::item:selected,
+        QComboBox QListView::item:hover,
+        QComboBox QListView::item:selected {{
             background-color: {DARK_SELECTION};
             color: #ffffff;
+        }}
+        QComboBox QAbstractItemView QScrollBar:vertical,
+        QComboBox QListView QScrollBar:vertical {{
+            background: {DARK_BG};
+            width: 6px;
+            margin: 0px;
+            border: none;
+        }}
+        QComboBox QAbstractItemView QScrollBar::handle:vertical,
+        QComboBox QListView QScrollBar::handle:vertical {{
+            background: {DARK_BORDER};
+            min-height: 16px;
+            border-radius: 3px;
+        }}
+        QComboBox QAbstractItemView QScrollBar::add-line:vertical,
+        QComboBox QAbstractItemView QScrollBar::sub-line:vertical,
+        QComboBox QListView QScrollBar::add-line:vertical,
+        QComboBox QListView QScrollBar::sub-line:vertical {{
+            height: 0px;
+            border: none;
         }}
     """
 

@@ -219,12 +219,12 @@ class EventLogPanel(QFrame):
         header_row.addStretch()
 
         self._status_combo = QComboBox()
+        UIComponents.setup_combobox(self._status_combo, self._theme)
         for label, _ in self.STATUS_FILTER_OPTIONS:
             self._status_combo.addItem(label)
         self._status_combo.currentIndexChanged.connect(self.refresh)
         self._status_combo.setMaximumWidth(110)
         self._status_combo.setFixedHeight(26)
-        self._status_combo.setStyleSheet(get_combobox_style(self._theme))
         header_row.addWidget(self._status_combo)
 
         btn_style_clear = f"""
@@ -514,16 +514,16 @@ class HistoryDialog(QDialog):
         filters_layout.addWidget(self._search_edit, 2)
 
         self._group_combo = QComboBox()
+        UIComponents.setup_combobox(self._group_combo, self._theme)
         self._group_combo.addItem("Все группы")
         self._group_combo.addItems(self._groups)
-        self._group_combo.setStyleSheet(get_combobox_style(self._theme))
         self._group_combo.currentIndexChanged.connect(self._refresh)
         filters_layout.addWidget(self._group_combo, 1)
 
         self._status_combo = QComboBox()
+        UIComponents.setup_combobox(self._status_combo, self._theme)
         for title, _code in self.STATUS_FILTER_OPTIONS:
             self._status_combo.addItem(title)
-        self._status_combo.setStyleSheet(get_combobox_style(self._theme))
         self._status_combo.currentIndexChanged.connect(self._refresh)
         filters_layout.addWidget(self._status_combo, 1)
 

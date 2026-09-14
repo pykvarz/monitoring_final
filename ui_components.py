@@ -23,7 +23,7 @@ from constants import (
     COLOR_MAINTENANCE, COLOR_TOTAL, SVG_ONLINE, SVG_OFFLINE,
     SVG_WAITING, SVG_MAINTENANCE, get_svg_total, get_svg_add_host, get_svg_add_group,
     get_svg_import, get_svg_export, get_svg_scan, get_svg_bulk, get_svg_theme,
-    get_svg_settings, get_svg_delete, get_menu_style,
+    get_svg_settings, get_svg_delete, get_menu_style, get_combobox_style,
     SVG_CARD_TOTAL, SVG_CARD_ONLINE, SVG_CARD_WAITING, SVG_CARD_OFFLINE, SVG_CARD_MAINTENANCE
 )
 
@@ -56,6 +56,14 @@ class UIComponents:
         painter.end()
         return QIcon(pixmap)
     
+    @staticmethod
+    def setup_combobox(combo: QComboBox, theme: str = "dark") -> QComboBox:
+        """Настройка QComboBox с чистым QListView без нативных белых рамок Windows"""
+        from PyQt5.QtWidgets import QListView
+        combo.setView(QListView())
+        combo.setStyleSheet(get_combobox_style(theme))
+        return combo
+
     @staticmethod
     def create_table(parent, theme="light") -> Tuple[QTableView, HostTableModel]:
         """Создание таблицы хостов"""
@@ -129,6 +137,7 @@ class UIComponents:
         
         # Фильтр по группам
         group_filter = QComboBox()
+        UIComponents.setup_combobox(group_filter, theme)
         group_filter.addItem("Все группы")
         group_filter.addItems(groups)
         group_filter.setMinimumWidth(150)
