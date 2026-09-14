@@ -39,9 +39,17 @@ def main():
     """Главная функция"""
     logging.info("Запуск приложения...")
     try:
+        if sys.platform == "win32":
+            import ctypes
+            try:
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("NetworkMonitor.App.v2")
+            except Exception:
+                pass
+
         app = QApplication(sys.argv)
         app.setStyle('Fusion')
         app.setApplicationName("Network Monitor")
+        app.setApplicationDisplayName("Network Monitor")
         logging.debug("QApplication создан")
 
         # Проверка прав на ICMP

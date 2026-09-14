@@ -42,6 +42,7 @@ from dashboard_manager import DashboardManager
 from export_import_manager import ExportImportManager
 from context_menu_manager import ContextMenuManager
 from table_settings_manager import TableSettingsManager
+from toast_notification import ToastManager
 
 
 
@@ -95,6 +96,7 @@ class MainWindow(QMainWindow):
         self._export_import_manager: ExportImportManager = None
         self._context_menu_manager: ContextMenuManager = None
         self._table_settings_manager: TableSettingsManager = None
+        self._toast_manager: ToastManager = None
         
         # Состояние
         self._is_scanning = False
@@ -124,10 +126,16 @@ class MainWindow(QMainWindow):
         self._load_initial_data()
 
     def _on_helpdesk_ticket_created(self, host: str, action: str) -> None:
-        NotificationService.show_notification("Helpdesk", f"Заявка ({action}) для {host} успешно создана.")
+        msg = f"Заявка ({action}) для {host} успешно создана."
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.show_info("Helpdesk", msg)
+        NotificationService.show_notification("Helpdesk", msg)
 
     def _on_helpdesk_ticket_failed(self, host: str, action: str, error_msg: str) -> None:
-        NotificationService.show_notification("Ошибка Helpdesk", f"Не удалось создать заявку ({action}) для {host}:\n{error_msg}")
+        msg = f"Не удалось создать заявку ({action}) для {host}:\n{error_msg}"
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.show_info("Ошибка Helpdesk", msg)
+        NotificationService.show_notification("Ошибка Helpdesk", msg)
 
     # ==================== ИНИЦИАЛИЗАЦИЯ ====================
 
@@ -394,11 +402,12 @@ class MainWindow(QMainWindow):
             self._repository
         )
         self._connect_context_menus()
-        
-        # btn_bulk удален из UI
-        # btn_bulk = self.findChild(QPushButton, "btn_bulk")
-        # if btn_bulk:
-        #     btn_bulk.clicked.connect(lambda: self._context_menu_manager.show_bulk_menu(btn_bulk))
+
+        # Toast Notification Manager
+        self._toast_manager = ToastManager(
+            self,
+            lambda: self._theme_manager.get_current_theme() if self._theme_manager else "dark"
+        )
         
         self._theme_manager.set_window_icon(self._theme_manager.get_current_theme())
 
@@ -503,10 +512,14 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(list)
     def _on_hosts_offline(self, offline_hosts: List[str]):
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.show_offline(offline_hosts)
         NotificationService.notify_offline_hosts(offline_hosts, self._config)
 
     @pyqtSlot(list)
     def _on_hosts_recovered(self, recovered_hosts: List[str]):
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.show_recovered(recovered_hosts)
         NotificationService.notify_recovered_hosts(recovered_hosts, self._config)
 
     def _update_status_bar(self, total: int = None):
@@ -692,6 +705,8 @@ class MainWindow(QMainWindow):
             self._scan_label.setStyleSheet("color: #f59e0b; font-weight: bold; padding: 2px 8px; border-radius: 4px; background: rgba(245, 158, 11, 0.15);")
             self._update_status_bar()
             self.statusBar().showMessage("Мониторинг приостановлен", 3000)
+            if hasattr(self, '_toast_manager') and self._toast_manager:
+                self._toast_manager.show_pause(True)
         else:
             btn_style = """
                 QPushButton {
@@ -720,10 +735,14 @@ class MainWindow(QMainWindow):
             self._scan_label.setStyleSheet(SCAN_LABEL_STYLE_FINISHED)
             self._update_status_bar()
             self.statusBar().showMessage("Мониторинг возобновлен", 3000)
+            if hasattr(self, '_toast_manager') and self._toast_manager:
+                self._toast_manager.show_pause(False)
             self._monitor_thread.force_scan()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.reposition_toasts()
 
     def update_hidden_columns_config(self):
         """Обновление конфигурации скрытых колонок (делегирование в TableSettingsManager)"""

@@ -15,8 +15,8 @@ from models import Host, validate_ip_or_hostname
 from host_manager import HostManager
 from ui_components import UIComponents
 from constants import (
-    get_menu_style, SVG_MAINTENANCE, SVG_ONLINE, SVG_OFFLINE, SVG_WAITING,
-    get_svg_add_group, get_svg_delete, get_svg_ping, get_svg_edit
+    get_menu_style, get_svg_add_group, get_svg_delete, get_svg_ping, get_svg_edit,
+    get_svg_wrench, get_svg_bell, get_svg_bell_off, get_svg_ticket, get_svg_ticket_check
 )
 from core.host_repository import HostRepository
 from helpdesk_service import HelpdeskService
@@ -81,22 +81,22 @@ class ContextMenuManager:
         
         if host:
             if host.status == "MAINTENANCE":
-                action_maint = menu.addAction(UIComponents._get_qicon(SVG_ONLINE), "Снять с тех.обслуживания")
+                action_maint = menu.addAction(UIComponents._get_qicon(get_svg_wrench(theme)), "Снять с тех.обслуживания")
             else:
-                action_maint = menu.addAction(UIComponents._get_qicon(SVG_MAINTENANCE), "Поставить на тех.обслуживание")
+                action_maint = menu.addAction(UIComponents._get_qicon(get_svg_wrench(theme)), "Поставить на тех.обслуживание")
 
             if host.notifications_enabled:
-                action_notify = menu.addAction(UIComponents._get_qicon(SVG_WAITING), "Отключить уведомления")
+                action_notify = menu.addAction(UIComponents._get_qicon(get_svg_bell_off(theme)), "Отключить уведомления")
             else:
-                action_notify = menu.addAction(UIComponents._get_qicon(SVG_ONLINE), "Включить уведомления")
+                action_notify = menu.addAction(UIComponents._get_qicon(get_svg_bell(theme)), "Включить уведомления")
                 
             # Helpdesk Integration
             action_hd_set = None
             action_hd_remove = None
             if hasattr(self._parent, '_config') and self._parent._config.helpdesk_enabled:
                 menu.addSeparator()
-                action_hd_set = menu.addAction(UIComponents._get_qicon(SVG_OFFLINE), "Создать тикет (Установить Статус 13)")
-                action_hd_remove = menu.addAction(UIComponents._get_qicon(SVG_ONLINE), "Создать тикет (Снять Статус 13)")
+                action_hd_set = menu.addAction(UIComponents._get_qicon(get_svg_ticket(theme)), "Helpdesk: открыть заявку (Статус 13)")
+                action_hd_remove = menu.addAction(UIComponents._get_qicon(get_svg_ticket_check(theme)), "Helpdesk: закрыть заявку")
         # ---
         
         action = menu.exec_(self._table.viewport().mapToGlobal(position))

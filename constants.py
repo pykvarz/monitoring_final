@@ -634,22 +634,55 @@ def get_combobox_style(theme="dark"):
     """
 
 def get_menu_style(theme="dark"):
+    if theme == "tactical":
+        return f"""
+        QMenu {{
+            background-color: {TACTICAL_SURFACE};
+            color: {TACTICAL_TEXT};
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            padding: 4px 2px;
+            font-family: Consolas, "Courier New", monospace;
+        }}
+        QMenu::item {{
+            padding: 7px 24px 7px 12px;
+            color: {TACTICAL_TEXT};
+            background-color: transparent;
+            border-radius: 0px;
+            margin: 1px 2px;
+        }}
+        QMenu::item:selected {{
+            background-color: {TACTICAL_SELECTION};
+            color: {TACTICAL_ONLINE};
+        }}
+        QMenu::item:disabled {{
+            color: {TACTICAL_TEXT_SECONDARY};
+        }}
+        QMenu::separator {{
+            height: 1px;
+            background-color: {TACTICAL_BORDER};
+            margin: 4px 6px;
+        }}
+        """
     return f"""
         QMenu {{
             background-color: {DARK_SURFACE};
             color: {DARK_TEXT};
             border: 1px solid {DARK_BORDER};
-            border-radius: 6px;
-            padding: 4px 0px;
+            border-radius: 8px;
+            padding: 5px 3px;
         }}
         QMenu::item {{
-            padding: 6px 28px 6px 24px;
+            padding: 7px 24px 7px 10px;
             color: {DARK_TEXT};
             background-color: transparent;
+            border-radius: 6px;
+            margin: 1px 3px;
         }}
         QMenu::item:selected {{
-            background-color: {DARK_SELECTION};
+            background-color: rgba(59, 130, 246, 0.22);
             color: #ffffff;
+            border: 1px solid rgba(59, 130, 246, 0.35);
         }}
         QMenu::item:disabled {{
             color: {DARK_TEXT_SECONDARY};
@@ -657,7 +690,7 @@ def get_menu_style(theme="dark"):
         QMenu::separator {{
             height: 1px;
             background-color: {DARK_BORDER};
-            margin: 4px 8px;
+            margin: 4px 6px;
         }}
     """
 
@@ -725,6 +758,26 @@ def get_svg_total(theme="dark"):
 def get_svg_history(theme="dark"):
     # Icon: Clock/History
     return _get_svg_wrapper('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', theme)
+
+def get_svg_wrench(theme="dark"):
+    # Icon: Wrench / Maintenance
+    return _get_svg_wrapper('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>', theme)
+
+def get_svg_bell(theme="dark"):
+    # Icon: Bell / Notifications active
+    return _get_svg_wrapper('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>', theme)
+
+def get_svg_bell_off(theme="dark"):
+    # Icon: Bell off / Notifications muted
+    return _get_svg_wrapper('<path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/>', theme)
+
+def get_svg_ticket(theme="dark"):
+    # Icon: Ticket / Helpdesk
+    return _get_svg_wrapper('<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><line x1="13" y1="5" x2="13" y2="19" stroke-dasharray="2 2"/>', theme)
+
+def get_svg_ticket_check(theme="dark"):
+    # Icon: Ticket resolved / closed
+    return _get_svg_wrapper('<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><polyline points="9 12 11 14 15 10"/>', theme)
 
 def _get_status_svg(path, color):
     # Увеличиваем размер SVG до 64x64 для четкого рендеринга (HiDPI)

@@ -60,48 +60,74 @@ class ToastNotification(QFrame):
 
     def _get_colors(self):
         """Палитра цветов в зависимости от типа и темы"""
-        is_dark = self._theme == "dark"
+        is_dark = self._theme in ("dark", "tactical")
+        is_tactical = self._theme == "tactical"
 
         type_colors = {
             ToastType.OFFLINE: {
                 "accent": "#ef4444",
                 "accent_bg": "rgba(239, 68, 68, 0.16)",
-                "icon": "⚠️",
+                "icon": "●",
                 "badge_border": "rgba(239, 68, 68, 0.4)",
             },
             ToastType.RECOVERED: {
                 "accent": "#10b981",
                 "accent_bg": "rgba(16, 185, 129, 0.16)",
-                "icon": "✅",
+                "icon": "●",
                 "badge_border": "rgba(16, 185, 129, 0.4)",
             },
             ToastType.WARNING: {
                 "accent": "#f59e0b",
                 "accent_bg": "rgba(245, 158, 11, 0.16)",
-                "icon": "⏸",
+                "icon": "●",
                 "badge_border": "rgba(245, 158, 11, 0.4)",
             },
             ToastType.INFO: {
                 "accent": "#3b82f6",
                 "accent_bg": "rgba(59, 130, 246, 0.16)",
-                "icon": "ℹ️",
+                "icon": "●",
                 "badge_border": "rgba(59, 130, 246, 0.4)",
             }
         }
 
         cfg = type_colors.get(self._toast_type, type_colors[ToastType.INFO])
 
-        cfg.update({
-            "bg": "#181d27",
-            "border": "#2c3445",
-            "title_color": "#f8fafc",
-            "text_color": "#cbd5e1",
-            "muted_color": "#94a3b8",
-            "tag_bg": "#222938",
-            "tag_border": "#333e54",
-            "tag_color": "#f1f5f9",
-            "shadow": QColor(0, 0, 0, 140),
-        })
+        if is_tactical:
+            cfg.update({
+                "bg": "#0D1117",
+                "border": "#1F232D",
+                "title_color": "#E2E8F0",
+                "text_color": "#C9D1D9",
+                "muted_color": "#6E7681",
+                "tag_bg": "#161B22",
+                "tag_border": "#30363D",
+                "tag_color": "#E2E8F0",
+                "shadow": QColor(0, 0, 0, 180),
+            })
+        elif is_dark:
+            cfg.update({
+                "bg": "#181d27",
+                "border": "#2c3445",
+                "title_color": "#f8fafc",
+                "text_color": "#cbd5e1",
+                "muted_color": "#94a3b8",
+                "tag_bg": "#222938",
+                "tag_border": "#333e54",
+                "tag_color": "#f1f5f9",
+                "shadow": QColor(0, 0, 0, 140),
+            })
+        else:
+            cfg.update({
+                "bg": "#ffffff",
+                "border": "#e2e8f0",
+                "title_color": "#1e293b",
+                "text_color": "#475569",
+                "muted_color": "#64748b",
+                "tag_bg": "#f1f5f9",
+                "tag_border": "#cbd5e1",
+                "tag_color": "#1e293b",
+                "shadow": QColor(0, 0, 0, 40),
+            })
 
         return cfg
 
@@ -317,7 +343,7 @@ class ToastManager(QObject):
         if not hosts:
             return
         count = len(hosts)
-        title = "⚠️ Узел недоступен" if count == 1 else f"⚠️ Недоступно узлов: {count}"
+        title = "Узел недоступен" if count == 1 else f"Недоступно узлов: {count}"
         self._add_toast(ToastType.OFFLINE, title, hosts=hosts)
 
     def show_recovered(self, hosts: List[str]):
@@ -325,7 +351,7 @@ class ToastManager(QObject):
         if not hosts:
             return
         count = len(hosts)
-        title = "✅ Узел восстановлен" if count == 1 else f"✅ Восстановлено узлов: {count}"
+        title = "Узел восстановлен" if count == 1 else f"Восстановлено узлов: {count}"
         self._add_toast(ToastType.RECOVERED, title, hosts=hosts)
 
     def show_pause(self, is_paused: bool):
@@ -333,14 +359,14 @@ class ToastManager(QObject):
         if is_paused:
             self._add_toast(
                 ToastType.WARNING,
-                "⏸ Мониторинг на паузе",
+                "Мониторинг на паузе",
                 message="Проверка узлов приостановлена. Нажмите кнопку паузы для продолжения.",
                 duration_ms=4000
             )
         else:
             self._add_toast(
                 ToastType.INFO,
-                "▶️ Мониторинг возобновлен",
+                "Мониторинг возобновлен",
                 message="Проверка узлов сети снова активна.",
                 duration_ms=3500
             )

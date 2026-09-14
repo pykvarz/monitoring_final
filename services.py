@@ -32,7 +32,10 @@ class NotificationService(INotificationService):
             app = QApplication.instance()
             if app and QSystemTrayIcon.isSystemTrayAvailable():
                 cls._tray_icon = QSystemTrayIcon(app)
-                cls._tray_icon.setIcon(app.style().standardIcon(QStyle.SP_ComputerIcon))
+                if not app.windowIcon().isNull():
+                    cls._tray_icon.setIcon(app.windowIcon())
+                else:
+                    cls._tray_icon.setIcon(app.style().standardIcon(QStyle.SP_DriveNetIcon))
                 cls._tray_icon.show()
         return cls._tray_icon
 
@@ -43,10 +46,10 @@ class NotificationService(INotificationService):
             return
 
         if len(hosts) <= 3:
-            title = "⚠️ Узел недоступен"
+            title = "Узел недоступен"
             message = "\n".join(hosts)
         else:
-            title = "⚠️ Несколько узлов недоступны"
+            title = "Несколько узлов недоступны"
             message = f"Недоступно устройств: {len(hosts)}"
 
         try:
@@ -55,7 +58,7 @@ class NotificationService(INotificationService):
 
             tray = NotificationService._get_tray_icon()
             if tray:
-                tray.showMessage(title, message, QSystemTrayIcon.Warning, 5000)
+                tray.showMessage(title, message, QSystemTrayIcon.Information, 5000)
 
         except Exception as e:
             logging.error(f"Ошибка отправки уведомления: {e}", exc_info=True)
@@ -67,10 +70,10 @@ class NotificationService(INotificationService):
             return
 
         if len(hosts) <= 3:
-            title = "✅ Узел восстановлен"
+            title = "Узел восстановлен"
             message = "\n".join(hosts)
         else:
-            title = "✅ Несколько узлов восстановлены"
+            title = "Несколько узлов восстановлены"
             message = f"Восстановлено устройств: {len(hosts)}"
 
         try:
