@@ -67,7 +67,11 @@ class HostTableModel(QAbstractTableModel):
         if status in self._icon_cache:
             return self._icon_cache[status]
         
-        svg_data = HostStatus[status].svg
+        if status in HostStatus.__members__:
+            svg_data = HostStatus[status].svg
+        else:
+            svg_data = HostStatus.ONLINE.svg
+
         renderer = QSvgRenderer(QByteArray(svg_data.encode('utf-8')))
         
         pixmap = QPixmap(20, 20)
@@ -214,7 +218,7 @@ class HostTableModel(QAbstractTableModel):
 
         elif role == Qt.ToolTipRole:
             if col == 0:
-                return HostStatus[host.status].title
+                return HostStatus[host.status].title if host.status in HostStatus.__members__ else host.status
             elif col == 1:
                 return "Уведомления включены" if host.notifications_enabled else "Уведомления отключены"
             elif col == 5:
@@ -258,17 +262,18 @@ class HostTableModel(QAbstractTableModel):
             if column == 0:
                 order_priority = {"ONLINE": 0, "WAITING": 1, "OFFLINE": 2, "MAINTENANCE": 3}
                 return order_priority.get(host.status, 9)
-            elif column == 1: return host.name.lower()
+            elif column == 1: return (host.name or "").lower()
             elif column == 2:
+                ip_str = host.ip or ""
                 try:
-                    parts = [int(part) for part in host.ip.split('.')]
+                    parts = [int(part) for part in ip_str.split('.')]
                     if len(parts) == 4 and all(0 <= p <= 255 for p in parts):
                         return (0, parts, "")
-                    return (1, [], host.ip.lower())
+                    return (1, [], ip_str.lower())
                 except Exception:
-                    return (1, [], host.ip.lower())
-            elif column == 3: return host.address.lower()
-            elif column == 4: return host.group.lower()
+                    return (1, [], ip_str.lower())
+            elif column == 3: return (host.address or "").lower()
+            elif column == 4: return (host.group or "").lower()
             elif column == 5:
                 if host.offline_since:
                     return host.offline_since

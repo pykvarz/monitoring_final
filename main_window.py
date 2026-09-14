@@ -855,6 +855,10 @@ class MainWindow(QMainWindow):
                 self._config.event_log_geometry = [rect.x(), rect.y(), rect.width(), rect.height()]
                 self._config.event_log_floating = True
                 self._storage.save_config(self._config)
+                try:
+                    self._floating_event_log.dock_requested.disconnect(self._dock_event_log)
+                except (TypeError, RuntimeError):
+                    pass
             self._floating_event_log.close()
         if hasattr(self, '_toast_manager') and self._toast_manager:
             self._toast_manager.close_all()

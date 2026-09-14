@@ -133,7 +133,7 @@ class ExcelService:
 
             # Данные узлов
             for host in hosts:
-                status_name = HostStatus[host.status].title
+                status_name = HostStatus[host.status].title if host.status in HostStatus.__members__ else (host.status or "")
                 last_seen = ""
                 if host.last_seen:
                     try:

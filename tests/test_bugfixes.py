@@ -363,6 +363,112 @@ class TestOfflineTimeTooltip(unittest.TestCase):
         self.assertIn("Недоступен с:", tooltip)
 
 
+class TestSortWithNoneValues(unittest.TestCase):
+    """Регрессия CRIT-1: сортировка по колонкам Название, Адрес, Группа падала при наличии None."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def test_sort_group_column_with_none(self):
+        model = HostTableModel()
+        h1 = _make_host(id='1', name='H1', ip='192.168.1.1', group='Servers')
+        h2 = _make_host(id='2', name='H2', ip='192.168.1.2')
+        h2.group = None
+        model.set_hosts([h1, h2])
+
+        # Не должно вызывать AttributeError: 'NoneType' object has no attribute 'lower'
+        model.sort(4, Qt.AscendingOrder)
+        self.assertEqual(model.rowCount(), 2)
+        model.sort(4, Qt.DescendingOrder)
+        self.assertEqual(model.rowCount(), 2)
+
+    def test_sort_name_column_with_none(self):
+        model = HostTableModel()
+        h1 = _make_host(id='1', name='H1', ip='192.168.1.1')
+        h2 = _make_host(id='2', name='H2', ip='192.168.1.2')
+        h2.name = None
+        model.set_hosts([h1, h2])
+
+        model.sort(1, Qt.AscendingOrder)
+        self.assertEqual(model.rowCount(), 2)
+        model.sort(1, Qt.DescendingOrder)
+        self.assertEqual(model.rowCount(), 2)
+
+    def test_sort_address_column_with_none(self):
+        model = HostTableModel()
+        h1 = _make_host(id='1', name='H1', ip='192.168.1.1', address='Room 101')
+        h2 = _make_host(id='2', name='H2', ip='192.168.1.2')
+        h2.address = None
+        model.set_hosts([h1, h2])
+
+        model.sort(3, Qt.AscendingOrder)
+        self.assertEqual(model.rowCount(), 2)
+        model.sort(3, Qt.DescendingOrder)
+        self.assertEqual(model.rowCount(), 2)
+
+
+class TestUnknownStatusHandling(unittest.TestCase):
+    """Регрессия CRIT-2: экспорт в Excel и тултип таблицы падали с KeyError при статусе UNKNOWN."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def test_excel_export_with_unknown_status(self):
+        from excel_service import ExcelService
+        import tempfile
+        h = _make_host(id='1', name='NodeUnknown', ip='10.0.0.99', status='UNKNOWN')
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tf:
+            tmp_path = tf.name
+
+        try:
+            # Не должно вызывать KeyError: 'UNKNOWN'
+            ExcelService.export_hosts(tmp_path, [h])
+            self.assertTrue(os.path.exists(tmp_path))
+            self.assertGreater(os.path.getsize(tmp_path), 0)
+        finally:
+            if os.path.exists(tmp_path):
+                try: os.remove(tmp_path)
+                except: pass
+
+    def test_table_model_tooltip_with_unknown_status(self):
+        model = HostTableModel()
+        h = _make_host(id='1', name='NodeUnknown', ip='10.0.0.99', status='UNKNOWN')
+        model.set_hosts([h])
+
+        # Не должно вызывать KeyError: 'UNKNOWN'
+        idx = model.index(0, 0)
+        tooltip = model.data(idx, Qt.ToolTipRole)
+        self.assertIn("UNKNOWN", str(tooltip))
+
+
+class TestFloatingEventLogCloseLifecycle(unittest.TestCase):
+    """Регрессия CRIT-3: при штатном закрытии MainWindow сброс event_log_floating обратно в False."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def test_close_event_preserves_event_log_floating(self):
+        from main_window import MainWindow
+        from di_container import setup_container
+        container = setup_container()
+        mw = MainWindow(container)
+
+        try:
+            mw._undock_event_log()
+            self.assertTrue(mw._config.event_log_floating)
+
+            class MockCloseEvent:
+                def accept(self): pass
+
+            mw.closeEvent(MockCloseEvent())
+            self.assertTrue(mw._config.event_log_floating, "event_log_floating must remain True on app exit")
+        finally:
+            mw.close()
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
 
