@@ -67,6 +67,13 @@ class HostManager:
         host = table_model.get_host(row)
         if not host:
             return
+        HostManager.delete_host_item(parent, host, repository)
+
+    @staticmethod
+    def delete_host_item(parent, host: Host, repository: HostRepository) -> None:
+        """Удаление одного узла по объекту Host"""
+        if not host:
+            return
 
         reply = QMessageBox.question(
             parent, "Подтверждение",
@@ -79,8 +86,15 @@ class HostManager:
     
     @staticmethod
     def edit_host(parent, row: int, table_model, groups: List[str], repository: HostRepository) -> None:
-        """Редактирование узла"""
+        """Редактирование узла по строке таблицы"""
         host = table_model.get_host(row)
+        if not host:
+            return
+        HostManager.edit_host_item(parent, host, groups, repository)
+
+    @staticmethod
+    def edit_host_item(parent, host: Host, groups: List[str], repository: HostRepository) -> None:
+        """Редактирование узла по объекту Host"""
         if not host:
             return
         
@@ -125,6 +139,13 @@ class HostManager:
     def toggle_maintenance(parent, row: int, table_model, repository: HostRepository) -> None:
         """Переключение статуса тех.обслуживания"""
         host = table_model.get_host(row)
+        if not host:
+            return
+        HostManager.toggle_maintenance_item(parent, host, repository)
+
+    @staticmethod
+    def toggle_maintenance_item(parent, host: Host, repository: HostRepository) -> None:
+        """Переключение статуса тех.обслуживания по объекту Host"""
         if not host:
             return
             
@@ -199,16 +220,26 @@ class HostManager:
 
     @staticmethod
     def toggle_notifications(parent, row: int, table_model, repository: HostRepository) -> None:
-        """Переключение уведомлений для узла"""
+        """Переключение уведомлений для узла по номеру строки таблицы"""
         host = table_model.get_host(row)
         if not host:
             return
+        HostManager.toggle_notifications_item(parent, host, repository)
+
+    @staticmethod
+    def toggle_notifications_item(parent, host: Host, repository: HostRepository) -> None:
+        """Переключение уведомлений для узла по объекту Host"""
+        if not host:
+            return
             
-        # Получаем свежие данные или используем из модели (лучше свежие для тогла)
+        # Получаем свежие данные или используем переданный хост
         hosts = repository.get_hosts_by_ids([host.id])
         if hosts:
             h = hosts[0]
             h.notifications_enabled = not h.notifications_enabled
             repository.update(h)
+        else:
+            host.notifications_enabled = not host.notifications_enabled
+            repository.update(host)
 
 

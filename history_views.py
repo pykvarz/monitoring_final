@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
     QDialog, QLineEdit, QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QFrame
 )
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QPoint
 from PyQt5.QtGui import QColor, QBrush
 
 from models import HostStatus
@@ -83,8 +83,9 @@ def _format_duration(seconds: float) -> str:
 
 class EventCardWidget(QFrame):
     """Карточка отдельного события в ленте журнала (крупные шрифты и просторные бейджи)"""
-    def __init__(self, when_str: str, full_time: str, host_name: str, status_code: str, theme="dark"):
+    def __init__(self, when_str: str, full_time: str, host_name: str, status_code: str, host_id: str = "", theme="dark"):
         super().__init__()
+        self.host_id = host_id
         status_info = {
             "ONLINE":       ("Online",              COLOR_ONLINE, "rgba(16, 185, 129, 0.15)", "●"),
             "OFFLINE":      ("Offline",             COLOR_OFFLINE, "rgba(239, 68, 68, 0.15)", "●"),
@@ -154,12 +155,17 @@ class EventCardWidget(QFrame):
         name_lbl.setStyleSheet(f"color: {self.name_color}; font-size: 14px; font-weight: bold; border: none; background: transparent;")
         layout.addWidget(name_lbl)
 
+    def contextMenuEvent(self, event):
+        event.ignore()
+
 
 class EventLogPanel(QFrame):
     """
     Правая боковая панель: живой журнал событий по ВСЕМ узлам.
     Показывает последние события с авто-обновлением каждые 10 сек.
     """
+
+    host_context_menu_requested = pyqtSignal(str, QPoint)
 
     STATUS_FILTER_OPTIONS = [
         ("Все", None),
@@ -267,6 +273,8 @@ class EventLogPanel(QFrame):
         self._list = QListWidget()
         self._list.setSelectionMode(QAbstractItemView.NoSelection)
         self._list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self._list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._list.customContextMenuRequested.connect(self._on_list_context_menu)
         self._list.setStyleSheet("""
             QListWidget {
                 background-color: transparent;
@@ -284,6 +292,23 @@ class EventLogPanel(QFrame):
         self._summary_label = QLabel("")
         self._summary_label.setStyleSheet("color: #94a3b8; font-size: 11px; border: none; background: transparent;")
         layout.addWidget(self._summary_label)
+
+    def _on_list_context_menu(self, pos: QPoint):
+        """Обработка нажатия ПКМ по элементу журнала событий"""
+        item = self._list.itemAt(pos)
+        host_id = None
+        if item:
+            host_id = item.data(Qt.UserRole)
+        if not host_id:
+            w = self._list.childAt(pos)
+            while w and not isinstance(w, EventCardWidget) and w != self._list:
+                w = w.parentWidget()
+            if isinstance(w, EventCardWidget) and hasattr(w, "host_id"):
+                host_id = w.host_id
+
+        if host_id:
+            global_pos = self._list.viewport().mapToGlobal(pos)
+            self.host_context_menu_requested.emit(host_id, global_pos)
 
     def clear_history(self):
         """Очистка журнала событий с подтверждением"""
@@ -346,9 +371,11 @@ class EventLogPanel(QFrame):
                 full_time = _format_ts(ev["timestamp"])
                 host_name = ev.get("host_name") or ev.get("host_id", "")
                 status_code = ev.get("new_status", "")
+                host_id = ev.get("host_id", "")
 
-                item_widget = EventCardWidget(when_str, full_time, host_name, status_code, theme=self._theme)
+                item_widget = EventCardWidget(when_str, full_time, host_name, status_code, host_id=host_id, theme=self._theme)
                 list_item = QListWidgetItem()
+                list_item.setData(Qt.UserRole, host_id)
                 list_item.setSizeHint(item_widget.sizeHint())
                 self._list.addItem(list_item)
                 self._list.setItemWidget(list_item, item_widget)
@@ -484,6 +511,8 @@ class HistoryDialog(QDialog):
         self._table.setAlternatingRowColors(True)
         self._table.setSortingEnabled(False)  # сортируем сами при загрузке (по времени)
         self._table.setStyleSheet(get_table_style(self._theme))
+        self._table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(self._on_table_context_menu)
         layout.addWidget(self._table, 1)
 
         self._summary_label = QLabel("")
@@ -515,12 +544,19 @@ class HistoryDialog(QDialog):
         self._table.setRowCount(0)
         self._table.setRowCount(len(events))
         for row, ev in enumerate(events):
+            host_id = ev.get("host_id", "")
             time_item = QTableWidgetItem(_format_ts(ev["timestamp"]))
+            time_item.setData(Qt.UserRole, host_id)
             name_item = QTableWidgetItem(ev.get("host_name") or ev.get("host_id", ""))
+            name_item.setData(Qt.UserRole, host_id)
             ip_item = QTableWidgetItem(ev.get("ip", ""))
+            ip_item.setData(Qt.UserRole, host_id)
             group_item = QTableWidgetItem(ev.get("group", ""))
+            group_item.setData(Qt.UserRole, host_id)
             old_item = QTableWidgetItem(_status_title(ev.get("old_status")))
+            old_item.setData(Qt.UserRole, host_id)
             new_item = QTableWidgetItem(_status_title(ev.get("new_status")))
+            new_item.setData(Qt.UserRole, host_id)
 
             new_item.setForeground(QBrush(QColor(_status_color(ev.get("new_status")))))
 
@@ -535,3 +571,16 @@ class HistoryDialog(QDialog):
             self._table.setItem(row, 5, new_item)
 
         self._summary_label.setText(f"Событий: {len(events)}" + (" (показаны последние 1000)" if len(events) >= 1000 else ""))
+
+    def _on_table_context_menu(self, pos: QPoint):
+        """Контекстное меню таблицы общего журнала событий"""
+        row = self._table.rowAt(pos.y())
+        if row < 0:
+            return
+        item = self._table.item(row, 0)
+        host_id = item.data(Qt.UserRole) if item else None
+        if host_id:
+            global_pos = self._table.viewport().mapToGlobal(pos)
+            parent = self.parent()
+            if parent and hasattr(parent, "_context_menu_manager") and parent._context_menu_manager:
+                parent._context_menu_manager.show_context_menu_for_host_id(host_id, global_pos)

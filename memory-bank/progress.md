@@ -94,3 +94,10 @@
 - В MainWindow подключен встроенный ToastManager: показ современных плавающих карточек уведомлений в правом нижнем углу.
 - Системные уведомления Windows очищены от эмодзи и устаревшей иконки предупреждения (Warning), в main.py зарегистрирован AppUserModelID (Network Monitor вместо Python).
 
+2026-09-14 — контекстное меню по ПКМ в журнале событий:
+- В ContextMenuManager добавлен метод show_context_menu_for_host_id и вынесен общий метод show_menu_for_host.
+- В HostManager добавлены методы edit_host_item, delete_host_item, toggle_maintenance_item, toggle_notifications_item для работы с объектом Host.
+- В боковой панели EventLogPanel реализован перехват ПКМ на карточках событий (EventCardWidget / _list) с сигналом host_context_menu_requested, подключенным к ContextMenuManager.
+- В диалоге HistoryDialog (Ctrl+H) добавлен вызов контекстного меню по ПКМ по строкам таблицы событий.
+- Тестовый набор расширен до 171 теста (165 passed, 6 skipped).
+

@@ -83,6 +83,40 @@ class TestHostManager(unittest.TestCase):
         fetched_h2 = self.repository.get("2")
         self.assertEqual(fetched_h2.ip, "192.168.1.51")
 
+    @patch("host_manager.QMessageBox.question")
+    def test_delete_host_item(self, mock_question):
+        from PyQt5.QtWidgets import QMessageBox
+        mock_question.return_value = QMessageBox.Yes
+        h = Host(id="del_1", ip="192.168.1.99", name="ToDelete")
+        self.repository.add(h)
+        self.assertIsNotNone(self.repository.get("del_1"))
+
+        HostManager.delete_host_item(None, h, self.repository)
+        self.assertIsNone(self.repository.get("del_1"))
+
+    def test_toggle_maintenance_item(self):
+        h = Host(id="maint_1", ip="192.168.1.101", name="MaintHost", status="ONLINE")
+        self.repository.add(h)
+
+        HostManager.toggle_maintenance_item(None, h, self.repository)
+        self.assertEqual(self.repository.get("maint_1").status, "MAINTENANCE")
+
+        h_updated = self.repository.get("maint_1")
+        HostManager.toggle_maintenance_item(None, h_updated, self.repository)
+        self.assertEqual(self.repository.get("maint_1").status, "ONLINE")
+
+    def test_toggle_notifications_item(self):
+        h = Host(id="notif_1", ip="192.168.1.102", name="NotifHost", notifications_enabled=True)
+        self.repository.add(h)
+
+        HostManager.toggle_notifications_item(None, h, self.repository)
+        self.assertFalse(self.repository.get("notif_1").notifications_enabled)
+
+        h_updated = self.repository.get("notif_1")
+        HostManager.toggle_notifications_item(None, h_updated, self.repository)
+        self.assertTrue(self.repository.get("notif_1").notifications_enabled)
+
 
 if __name__ == '__main__':
     unittest.main()
+

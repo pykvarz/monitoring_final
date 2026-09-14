@@ -3,11 +3,12 @@ from unittest.mock import MagicMock, patch
 import sys
 import os
 
-from PyQt5.QtCore import QCoreApplication
+from PyQt5.QtCore import QCoreApplication, QPoint
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from context_menu_manager import ContextMenuManager
+from models import Host
 
 
 class TestContextMenuManager(unittest.TestCase):
@@ -79,6 +80,89 @@ class TestContextMenuManager(unittest.TestCase):
         # Should be list: ['xterm', '-e', 'ping', '10.0.0.1']
         self.assertEqual(args, ['xterm', '-e', 'ping', valid_ip])
 
+    @patch("context_menu_manager.QMessageBox.information")
+    def test_show_context_menu_for_host_id_missing_host(self, mock_info):
+        """Проверка безопасного поведения при отсутствии хоста в базе."""
+        self.mock_repo.get.return_value = None
+        self.manager.show_context_menu_for_host_id("non_existent_id", QPoint(100, 100))
+        mock_info.assert_called_once()
+        self.assertIn("не найден", mock_info.call_args[0][2])
+
+    def test_show_context_menu_for_host_id_found(self):
+        """Проверка вызова show_menu_for_host при нахождении хоста."""
+        host = Host(id="h1", ip="192.168.1.10", name="TestHost")
+        self.mock_repo.get.return_value = host
+
+        with patch.object(self.manager, "show_menu_for_host") as mock_show_menu:
+            pt = QPoint(50, 60)
+            self.manager.show_context_menu_for_host_id("h1", pt)
+            mock_show_menu.assert_called_once_with(host, pt)
+
+    def test_event_log_panel_context_menu_signal(self):
+        """Проверка эмиссии сигнала host_context_menu_requested из EventLogPanel."""
+        from history_views import EventLogPanel
+        mock_repo = MagicMock()
+        mock_repo.get_history_events.return_value = [
+            {
+                "host_id": "host_42",
+                "host_name": "Switch42",
+                "old_status": "ONLINE",
+                "new_status": "OFFLINE",
+                "timestamp": "2026-09-14T10:00:00+00:00"
+            }
+        ]
+
+        panel = EventLogPanel(repository=mock_repo, theme="dark")
+        panel.refresh()
+
+        received_signals = []
+        panel.host_context_menu_requested.connect(lambda hid, pos: received_signals.append((hid, pos)))
+
+        # Первый элемент списка
+        item = panel._list.item(0)
+        self.assertIsNotNone(item)
+        self.assertEqual(item.data(1), None)  # Qt.UserRole = 32
+        from PyQt5.QtCore import Qt
+        self.assertEqual(item.data(Qt.UserRole), "host_42")
+
+        # Имитируем запрос контекстного меню
+        rect = panel._list.visualItemRect(item)
+        panel._on_list_context_menu(rect.center())
+
+        self.assertEqual(len(received_signals), 1)
+        self.assertEqual(received_signals[0][0], "host_42")
+
+    def test_history_dialog_table_context_menu(self):
+        """Проверка вызова контекстного меню из таблицы HistoryDialog."""
+        from history_views import HistoryDialog
+        from PyQt5.QtWidgets import QWidget
+        parent_widget = QWidget()
+        parent_widget._context_menu_manager = MagicMock()
+        mock_repo = MagicMock()
+        mock_repo.get_history_events.return_value = [
+            {
+                "host_id": "host_99",
+                "host_name": "Router99",
+                "old_status": "ONLINE",
+                "new_status": "OFFLINE",
+                "timestamp": "2026-09-14T11:00:00+00:00"
+            }
+        ]
+
+        dlg = HistoryDialog(parent=parent_widget, repository=mock_repo, groups=["Default"], theme="dark")
+        dlg._refresh()
+
+        self.assertEqual(dlg._table.rowCount(), 1)
+        from PyQt5.QtCore import Qt
+        self.assertEqual(dlg._table.item(0, 0).data(Qt.UserRole), "host_99")
+
+        dlg._on_table_context_menu(QPoint(10, 10))
+        parent_widget._context_menu_manager.show_context_menu_for_host_id.assert_called_once()
+        args = parent_widget._context_menu_manager.show_context_menu_for_host_id.call_args[0]
+        self.assertEqual(args[0], "host_99")
+
 
 if __name__ == '__main__':
     unittest.main()
+
+

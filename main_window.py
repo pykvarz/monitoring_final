@@ -561,6 +561,10 @@ class MainWindow(QMainWindow):
         self._table.customContextMenuRequested.connect(
             self._context_menu_manager.show_host_context_menu
         )
+        if hasattr(self, "_event_log_panel") and self._event_log_panel:
+            self._event_log_panel.host_context_menu_requested.connect(
+                self._context_menu_manager.show_context_menu_for_host_id
+            )
 
     # ==================== USER ACTIONS ====================
 

@@ -8,7 +8,7 @@ import sys
 import subprocess
 import ipaddress
 from typing import List, Callable
-from PyQt5.QtWidgets import QMenu, QMessageBox, QAction
+from PyQt5.QtWidgets import QMenu, QMessageBox, QAction, QInputDialog
 from PyQt5.QtCore import QPoint, Qt
 
 from models import Host, validate_ip_or_hostname
@@ -51,16 +51,36 @@ class ContextMenuManager:
         self._groups = groups
 
     def show_host_context_menu(self, position: QPoint) -> None:
-        """Показ контекстного меню для хоста"""
+        """Показ контекстного меню для хоста из главной таблицы"""
         row = self._table.rowAt(position.y())
         if row < 0:
+            return
+
+        host = self._table_model.get_host(row)
+        if not host:
+            return
+
+        global_pos = self._table.viewport().mapToGlobal(position)
+        self.show_menu_for_host(host, global_pos)
+
+    def show_context_menu_for_host_id(self, host_id: str, global_pos: QPoint) -> None:
+        """Показ контекстного меню для хоста по его ID (например, из журнала событий)"""
+        if not host_id:
+            return
+        host = self._repository.get(host_id)
+        if not host:
+            QMessageBox.information(self._parent, "Информация", "Узел не найден в базе данных (возможно, был удалён)")
+            return
+        self.show_menu_for_host(host, global_pos)
+
+    def show_menu_for_host(self, host: Host, global_pos: QPoint) -> None:
+        """Показ контекстного меню для объекта Host в указанной позиции"""
+        if not host:
             return
 
         theme = self._get_theme()
         menu = QMenu()
         menu.setStyleSheet(get_menu_style(theme))
-
-        host = self._table_model.get_host(row)
 
         action_ping = menu.addAction(UIComponents._get_qicon(get_svg_ping(theme)), "Пинг в CMD")
 
@@ -79,40 +99,38 @@ class ContextMenuManager:
         action_delete = menu.addAction(UIComponents._get_qicon(get_svg_delete(theme)), "Удалить")
         menu.addSeparator()
         
-        if host:
-            if host.status == "MAINTENANCE":
-                action_maint = menu.addAction(UIComponents._get_qicon(get_svg_wrench(theme)), "Снять с тех.обслуживания")
-            else:
-                action_maint = menu.addAction(UIComponents._get_qicon(get_svg_wrench(theme)), "Поставить на тех.обслуживание")
+        if host.status == "MAINTENANCE":
+            action_maint = menu.addAction(UIComponents._get_qicon(get_svg_wrench(theme)), "Снять с тех.обслуживания")
+        else:
+            action_maint = menu.addAction(UIComponents._get_qicon(get_svg_wrench(theme)), "Поставить на тех.обслуживание")
 
-            if host.notifications_enabled:
-                action_notify = menu.addAction(UIComponents._get_qicon(get_svg_bell_off(theme)), "Отключить уведомления")
-            else:
-                action_notify = menu.addAction(UIComponents._get_qicon(get_svg_bell(theme)), "Включить уведомления")
-                
-            # Helpdesk Integration
-            action_hd_set = None
-            action_hd_remove = None
-            if hasattr(self._parent, '_config') and self._parent._config.helpdesk_enabled:
-                menu.addSeparator()
-                action_hd_set = menu.addAction(UIComponents._get_qicon(get_svg_ticket(theme)), "Helpdesk: открыть заявку (Статус 13)")
-                action_hd_remove = menu.addAction(UIComponents._get_qicon(get_svg_ticket_check(theme)), "Helpdesk: закрыть заявку")
-        # ---
+        if host.notifications_enabled:
+            action_notify = menu.addAction(UIComponents._get_qicon(get_svg_bell_off(theme)), "Отключить уведомления")
+        else:
+            action_notify = menu.addAction(UIComponents._get_qicon(get_svg_bell(theme)), "Включить уведомления")
+            
+        # Helpdesk Integration
+        action_hd_set = None
+        action_hd_remove = None
+        if hasattr(self._parent, '_config') and self._parent._config.helpdesk_enabled:
+            menu.addSeparator()
+            action_hd_set = menu.addAction(UIComponents._get_qicon(get_svg_ticket(theme)), "Helpdesk: открыть заявку (Статус 13)")
+            action_hd_remove = menu.addAction(UIComponents._get_qicon(get_svg_ticket_check(theme)), "Helpdesk: закрыть заявку")
         
-        action = menu.exec_(self._table.viewport().mapToGlobal(position))
+        action = menu.exec_(global_pos)
 
         if action == action_ping:
-            self._ping_host_cmd(row)
+            self._ping_cmd(host.ip, label=host.name)
         elif action_ping_cisco is not None and action == action_ping_cisco:
             self._ping_cmd(cisco_ip, label="Cisco")
         elif action == action_edit:
-            HostManager.edit_host(self._parent, row, self._table_model, self._groups, self._repository)
+            HostManager.edit_host_item(self._parent, host, self._groups, self._repository)
         elif action == action_delete:
-            HostManager.delete_host(self._parent, row, self._table_model, self._repository)
+            HostManager.delete_host_item(self._parent, host, self._repository)
         elif action == action_maint:
-            HostManager.toggle_maintenance(self._parent, row, self._table_model, self._repository)
+            HostManager.toggle_maintenance_item(self._parent, host, self._repository)
         elif action == action_notify:
-            HostManager.toggle_notifications(self._parent, row, self._table_model, self._repository)
+            HostManager.toggle_notifications_item(self._parent, host, self._repository)
         elif action_hd_set is not None and action == action_hd_set:
             reasons = getattr(self._parent._config, 'helpdesk_reasons', ["без связи", "ошибка пинга", "техническое обслуживание"])
             reason, ok = QInputDialog.getItem(self._parent, "Helpdesk", "Укажите причину заявки:", reasons, 0, True)
