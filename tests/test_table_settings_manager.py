@@ -33,6 +33,7 @@ class TestTableSettingsManager(unittest.TestCase):
         # Create table with model
         db_manager, data_manager, repository, hosts = TestFixtures.create_repository_with_data(3)
         self.db_manager = db_manager
+        self.repository = repository
         
         self.table_model = HostTableModel(repository)
         self.table = QTableView()
@@ -53,7 +54,6 @@ class TestTableSettingsManager(unittest.TestCase):
         """Cleanup."""
         TestFixtures.cleanup_db(self.db_manager)
     
-    @unittest.skip("Default column widths vary by Qt version/platform")
     def test_restore_column_widths(self):
         """Test restoring column widths from config."""
         # Set config with specific widths

@@ -66,13 +66,13 @@ class TestFilterManager(unittest.TestCase):
         """Cleanup."""
         TestFixtures.cleanup_db(self.db_manager)
     
-    @unittest.skip("Table model updates asynchronously - difficult to test")
     def test_text_search(self):
         """Test text search filtering."""
         # Add a unique host
         unique_host = TestFixtures.create_sample_host(name="UniqueServer", ip="10.0.0.99")
         self.repository.add(unique_host)
-        # Table model updates automatically via signals
+        self.table_model.set_hosts(self.repository.get_all())
+        QApplication.processEvents()
         
         # Search for unique host
         self.search_edit.setText("UniqueServer")
@@ -120,7 +120,6 @@ class TestFilterManager(unittest.TestCase):
                 else:
                     self.assertFalse(is_visible, f"Non-ONLINE host should be hidden: {host.name}")
     
-    @unittest.skip("Table model updates asynchronously - difficult to test")
     def test_combined_filters(self):
         """Test combining search text, group, and status filters."""
         # Add specific host
@@ -130,7 +129,8 @@ class TestFilterManager(unittest.TestCase):
             status="ONLINE"
         )
         self.repository.add(test_host)
-        # Table model updates automatically
+        self.table_model.set_hosts(self.repository.get_all())
+        QApplication.processEvents()
         
         # Apply combined filters
         self.search_edit.setText("Test")
@@ -192,13 +192,13 @@ class TestFilterManager(unittest.TestCase):
         
         self.assertEqual(self.status_filter.currentText(), "Offline")
     
-    @unittest.skip("Table model updates asynchronously - difficult to test")
     def test_search_by_ip(self):
         """Test searching by IP address."""
         # Add host with specific IP
         test_host = TestFixtures.create_sample_host(ip="172.16.0.99")
         self.repository.add(test_host)
-        # Table model updates automatically
+        self.table_model.set_hosts(self.repository.get_all())
+        QApplication.processEvents()
         
         # Search by IP
         self.search_edit.setText("172.16.0.99")

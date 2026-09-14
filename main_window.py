@@ -346,7 +346,7 @@ class MainWindow(QMainWindow):
         self._content_splitter.setStretchFactor(1, 0)
         default_sizes = [950, 320]
         saved_sizes = getattr(self._config, 'splitter_sizes', None)
-        if saved_sizes and len(saved_sizes) == 2 and sum(saved_sizes) > 0:
+        if saved_sizes and len(saved_sizes) == 2 and sum(saved_sizes) > 50 and saved_sizes[1] >= 50:
             self._content_splitter.setSizes(saved_sizes)
         else:
             self._content_splitter.setSizes(default_sizes)

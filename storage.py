@@ -5,6 +5,7 @@
 """
 
 import json
+import dataclasses
 import logging
 from pathlib import Path
 from typing import List
@@ -89,8 +90,13 @@ class StorageManager(IStorageRepository):
             try:
                 with open(self._config_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                    valid_keys = {f.name for f in dataclasses.fields(AppConfig)}
+                    unknown_keys = set(data.keys()) - valid_keys
+                    if unknown_keys:
+                        logging.warning(f"Неизвестные поля в конфигурации (пропущены): {unknown_keys}")
+                    filtered_data = {k: v for k, v in data.items() if k in valid_keys}
                     try:
-                        return AppConfig(**data)
+                        return AppConfig(**filtered_data)
                     except (TypeError, ValueError) as e:
                         logging.warning(f"Ошибка в конфигурации, используются значения по умолчанию: {e}")
                         return AppConfig()

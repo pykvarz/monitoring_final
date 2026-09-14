@@ -24,9 +24,9 @@ def build_exe():
         f"--name={exe_name}",
         # Add necessary hidden imports if PyInstaller misses them
         "--hidden-import=PyQt5",
+        "--hidden-import=PyQt5.QtSvg",
         "--hidden-import=openpyxl",
         "--hidden-import=sqlite3",
-        "--hidden-import=plyer.platforms.win.notification",
         # Bundle data files if needed (e.g., config.json if it's static, but usually it's created at runtime)
         # "--add-data=config.json;." 
         main_script

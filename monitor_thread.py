@@ -280,6 +280,7 @@ class MonitorThread(QThread):
                     thread_db = QSqlDatabase.database(connection_name)
                     if thread_db.isOpen():
                         thread_db.close()
+                    del thread_db
                 except Exception:
                     pass
                 QSqlDatabase.removeDatabase(connection_name)

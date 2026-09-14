@@ -19,21 +19,33 @@ class HelpdeskService:
     """Сервис для работы с Helpdesk (Асинхронная реализация)"""
     _loop = None
     _thread = None
+    _lock = threading.Lock()
     signals = HelpdeskSignals()
 
     @classmethod
     def _start_loop(cls):
-        if cls._thread and cls._thread.is_alive():
-            return
+        with cls._lock:
+            if cls._thread and cls._thread.is_alive():
+                return
+                
+            cls._loop = asyncio.new_event_loop()
             
-        cls._loop = asyncio.new_event_loop()
-        
-        def run_loop():
-            asyncio.set_event_loop(cls._loop)
-            cls._loop.run_forever()
-            
-        cls._thread = threading.Thread(target=run_loop, daemon=True, name="HelpdeskAsyncLoop")
-        cls._thread.start()
+            def run_loop():
+                asyncio.set_event_loop(cls._loop)
+                cls._loop.run_forever()
+                
+            cls._thread = threading.Thread(target=run_loop, daemon=True, name="HelpdeskAsyncLoop")
+            cls._thread.start()
+
+    @classmethod
+    def _log_future_error(cls, future, host_name: str, action: str):
+        """Callback для логирования ошибок из фоновых корутин"""
+        def _callback(fut):
+            try:
+                fut.result()
+            except Exception as e:
+                logging.error(f"HelpdeskService: Ошибка заявки ({action}) для {host_name}: {e}")
+        future.add_done_callback(_callback)
 
     @classmethod
     def shutdown(cls):
@@ -53,10 +65,11 @@ class HelpdeskService:
         cls._start_loop()
         for host in hosts:
             logging.info(f"HelpdeskService: Планирование заявки (Установить) для {host}")
-            asyncio.run_coroutine_threadsafe(
+            future = asyncio.run_coroutine_threadsafe(
                 asyncio.wait_for(cls._process_ticket_task_async(config.helpdesk_url, host, "Установить", reason), timeout=60.0),
                 cls._loop
             )
+            cls._log_future_error(future, host, "Установить")
             
     @classmethod
     def process_recovered(cls, hosts: list, config: AppConfig, reason: str = "восстановление связи"):
@@ -65,10 +78,11 @@ class HelpdeskService:
         cls._start_loop()
         for host in hosts:
             logging.info(f"HelpdeskService: Планирование заявки (Снять) для {host}")
-            asyncio.run_coroutine_threadsafe(
+            future = asyncio.run_coroutine_threadsafe(
                 asyncio.wait_for(cls._process_ticket_task_async(config.helpdesk_url, host, "Снять", reason), timeout=60.0),
                 cls._loop
             )
+            cls._log_future_error(future, host, "Снять")
 
     @staticmethod
     async def _process_ticket_task_async(url: str, host_name: str, status_action: str, reason: str = "без связи"):
