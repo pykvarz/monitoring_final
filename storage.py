@@ -123,22 +123,23 @@ class StorageManager(IStorageRepository):
             return False
             
         logging.info(f"Начало миграции {len(hosts)} хостов в БД...")
-        query = db_manager.get_db().exec_
+        db = db_manager.get_db()
         
         from PyQt5.QtSql import QSqlQuery
-        sql = QSqlQuery()
+        sql = QSqlQuery(db)
         sql.prepare("""
-            INSERT OR IGNORE INTO hosts (id, ip, name, grp, status, notifications_enabled, offline_since, last_seen)
-            VALUES (:id, :ip, :name, :grp, :status, :notif, :offline, :seen)
+            INSERT OR IGNORE INTO hosts (id, ip, name, address, grp, status, notifications_enabled, offline_since, last_seen)
+            VALUES (:id, :ip, :name, :address, :grp, :status, :notif, :offline, :seen)
         """)
         
         count = 0
-        db_manager.get_db().transaction()
+        db.transaction()
         try:
             for host in hosts:
                 sql.bindValue(":id", host.id)
                 sql.bindValue(":ip", host.ip)
                 sql.bindValue(":name", host.name)
+                sql.bindValue(":address", host.address or "")
                 sql.bindValue(":grp", host.group)
                 sql.bindValue(":status", host.status)
                 sql.bindValue(":notif", 1 if host.notifications_enabled else 0)
@@ -150,7 +151,7 @@ class StorageManager(IStorageRepository):
                 else:
                     logging.warning(f"Ошибка миграции хоста {host.ip}: {sql.lastError().text()}")
             
-            db_manager.get_db().commit()
+            db.commit()
             logging.info(f"Миграция завершена. Перенесено {count} записей.")
             
             # Переименовываем старый файл, чтобы не мигрировать снова
@@ -161,6 +162,8 @@ class StorageManager(IStorageRepository):
                 
             return True
         except Exception as e:
-            db_manager.get_db().rollback()
+            db.rollback()
             logging.error(f"Критическая ошибка миграции: {e}")
             return False
+        finally:
+            sql.finish()

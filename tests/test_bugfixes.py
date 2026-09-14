@@ -469,6 +469,106 @@ class TestFloatingEventLogCloseLifecycle(unittest.TestCase):
             mw.close()
 
 
+class TestSettingsDialogPreservesHUDConfig(unittest.TestCase):
+    """Регрессия HIGH-1: SettingsDialog.get_config() сбрасывал splitter_sizes и параметры плавающего HUD."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def test_get_config_preserves_hud_and_splitter_settings(self):
+        from dialogs import SettingsDialog
+        from models import AppConfig
+
+        orig_config = AppConfig(
+            splitter_sizes=[250, 450],
+            event_log_floating=True,
+            event_log_on_top=False,
+            event_log_geometry=[150, 250, 500, 600]
+        )
+
+        dlg = SettingsDialog(None, orig_config)
+        new_config = dlg.get_config()
+
+        self.assertEqual(new_config.splitter_sizes, [250, 450])
+        self.assertTrue(new_config.event_log_floating)
+        self.assertFalse(new_config.event_log_on_top)
+        self.assertEqual(new_config.event_log_geometry, [150, 250, 500, 600])
+
+
+class TestContextMenuManagerBulkMenu(unittest.TestCase):
+    """Регрессия HIGH-2: ContextMenuManager.show_bulk_menu падал с NameError: SVG_MAINTENANCE."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def test_show_bulk_menu_no_name_error(self):
+        from context_menu_manager import ContextMenuManager
+        from PyQt5.QtWidgets import QWidget, QPushButton
+        from unittest.mock import patch, MagicMock
+
+        parent = QWidget()
+        repo = MagicMock()
+        cmm = ContextMenuManager(parent, MagicMock(), MagicMock(), ["Default"], lambda: "dark", repo)
+        sender = QPushButton("Bulk", parent)
+
+        # Мокаем exec_ меню, чтобы окно не блокировало тест
+        with patch("PyQt5.QtWidgets.QMenu.exec_", return_value=None):
+            # Не должно вызывать NameError
+            cmm.show_bulk_menu(sender)
+
+
+class TestStorageMigrateToDbPreservesAddress(unittest.TestCase):
+    """Регрессия HIGH-3: StorageManager.migrate_to_db терял поле address и не передавал дескриптор БД."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def test_migrate_to_db_copies_address_and_finishes_query(self):
+        import tempfile
+        import json
+        from pathlib import Path
+        from storage import StorageManager
+
+        db_manager = TestFixtures.create_in_memory_db()
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                hosts_file = Path(tmpdir) / "hosts.json"
+                raw_data = [
+                    {
+                        "id": "h_mig_1",
+                        "name": "Server 1",
+                        "ip": "192.168.10.50",
+                        "address": "Floor 2, Rack 5",
+                        "group": "Servers",
+                        "status": "ONLINE",
+                        "notifications_enabled": True
+                    }
+                ]
+                with open(hosts_file, "w", encoding="utf-8") as f:
+                    json.dump(raw_data, f)
+
+                storage = StorageManager()
+                storage._hosts_file = hosts_file
+                success = storage.migrate_to_db(db_manager)
+                self.assertTrue(success)
+
+                # Проверяем, что в БД поле address сохранилось
+                db = db_manager.get_db()
+                from PyQt5.QtSql import QSqlQuery
+                q = QSqlQuery(db)
+                q.exec_("SELECT address FROM hosts WHERE id = 'h_mig_1'")
+                self.assertTrue(q.next())
+                saved_address = q.value(0)
+                q.finish()
+
+                self.assertEqual(saved_address, "Floor 2, Rack 5")
+        finally:
+            TestFixtures.cleanup_db(db_manager)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
 

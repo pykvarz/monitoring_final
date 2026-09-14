@@ -171,9 +171,9 @@ class ContextMenuManager:
         menu = QMenu(self._parent)
         menu.setStyleSheet(get_menu_style(theme))
 
-        action_maint = menu.addAction(UIComponents._get_qicon(SVG_MAINTENANCE), "Переключить тех.обслуживание")
+        action_maint = menu.addAction(UIComponents._get_qicon(get_svg_wrench(theme)), "Переключить тех.обслуживание")
         action_group = menu.addAction(UIComponents._get_qicon(get_svg_add_group(theme)), "Изменить группу")
-        action_notify = menu.addAction(UIComponents._get_qicon(SVG_WAITING), "Переключить уведомления")
+        action_notify = menu.addAction(UIComponents._get_qicon(get_svg_bell(theme)), "Переключить уведомления")
         menu.addSeparator()
         action_delete = menu.addAction(UIComponents._get_qicon(get_svg_delete(theme)), "Удалить выбранные")
 

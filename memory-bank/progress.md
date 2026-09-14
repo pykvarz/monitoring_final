@@ -49,7 +49,7 @@
 - [x] Repository Pattern
 - [x] Интерфейсы-абстракции для тестирования
 - [x] Очистка мертвого кода (удалены logger_setup.py, menu_builder.py)
-- [x] Набор тестов (pytest, 188 тестов: 188 passed)
+- [x] Набор тестов (pytest, 191 тест: 191 passed)
 - [x] Сборка .exe (PyInstaller + build_exe.py)
 
 ## Открытые вопросы / возможные точки роста
@@ -58,6 +58,12 @@
 - Неиспользуемая библиотека `plyer` в requirements.txt (заменена на QSystemTrayIcon)
 
 ## Последнее обновление memory-bank
+2026-09-14 — устранение дефектов высокой важности (HIGH-1, HIGH-2, HIGH-3):
+- HIGH-1: Сохранены параметры плавающего HUD (`event_log_floating`, `event_log_on_top`, `event_log_geometry`) и размеры сплиттера (`splitter_sizes`) в `SettingsDialog.get_config` (`dialogs.py`), предотвращая их сброс на дефолтные значения при сохранении настроек.
+- HIGH-2: Устранён `NameError: SVG_MAINTENANCE` в `ContextMenuManager.show_bulk_menu` (`context_menu_manager.py`), иконки меню переведены на единую контурную дизайн-систему Lucide (`get_svg_wrench`, `get_svg_bell`).
+- HIGH-3: В `StorageManager.migrate_to_db` (`storage.py`) добавлено сохранение поля `address`, передача дескриптора БД `QSqlQuery(db)` и гарантированное закрытие запроса через `sql.finish()` в блоке `finally`.
+- Тестовый набор расширен до 191 теста (191 passed).
+
 2026-09-14 — устранение критических дефектов (CRIT-1, CRIT-2, CRIT-3):
 - CRIT-1: Защищена сортировка по колонкам «Название», «IP адрес», «Местоположение», «Группа» в `table_model.py` от вызова `.lower()` на `None` при наличии `NULL`-значений в БД SQLite.
 - CRIT-2: Устранён сбой `KeyError: 'UNKNOWN'` при экспорте узлов в Excel (`excel_service.py`) и при формировании всплывающих подсказок (`table_model.py`) для узлов со статусом по умолчанию в БД `UNKNOWN`.

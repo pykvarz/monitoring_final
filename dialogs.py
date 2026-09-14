@@ -346,4 +346,8 @@ class SettingsDialog(QDialog):
             hidden_columns=list(self._config.hidden_columns),
             theme=self._theme_combo.currentData(),
             custom_groups=list(self._config.custom_groups),
+            splitter_sizes=list(self._config.splitter_sizes),
+            event_log_floating=self._config.event_log_floating,
+            event_log_on_top=self._config.event_log_on_top,
+            event_log_geometry=list(self._config.event_log_geometry),
         )
