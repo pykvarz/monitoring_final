@@ -277,8 +277,14 @@ class SettingsDialog(QDialog):
         self._hd_url = QLineEdit(getattr(self._config, 'helpdesk_url', ''))
         self._hd_url.setPlaceholderText("https://helpdesk.company.com/create")
         
+        reasons_list = getattr(self._config, 'helpdesk_reasons', ["без связи", "ошибка пинга", "техническое обслуживание"])
+        self._hd_reasons = QLineEdit(", ".join(reasons_list))
+        self._hd_reasons.setPlaceholderText("без связи, ошибка пинга, тех. работы")
+        self._hd_reasons.setToolTip("Готовые варианты причин (через запятую)")
+        
         helpdesk_layout.addRow("", self._hd_enabled)
         helpdesk_layout.addRow("URL создания заявки:", self._hd_url)
+        helpdesk_layout.addRow("Готовые причины:", self._hd_reasons)
         helpdesk_group.setLayout(helpdesk_layout)
 
         # Группа: Внешний вид
@@ -332,6 +338,7 @@ class SettingsDialog(QDialog):
             history_retention_days=self._retention_spin.value(),
             helpdesk_enabled=self._hd_enabled.isChecked(),
             helpdesk_url=self._hd_url.text().strip(),
+            helpdesk_reasons=[r.strip() for r in self._hd_reasons.text().split(",") if r.strip()],
             column_widths=dict(self._config.column_widths),
             column_order=list(self._config.column_order),
             hidden_columns=list(self._config.hidden_columns),
