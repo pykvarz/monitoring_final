@@ -793,6 +793,32 @@ def get_svg_theme(theme="light"):
 def get_svg_ping(theme="dark"):
     return _get_svg_wrapper('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>', theme)
 
+def get_svg_app_icon(theme="dark"):
+    """Брендовая иконка приложения Network Monitor: контрастный темный бейдж, дисплей монитора и неоновый пульс активности сети"""
+    return '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="app_bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0B111E"/>
+      <stop offset="100%" stop-color="#162033"/>
+    </linearGradient>
+    <linearGradient id="app_border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="app_pulse" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="url(#app_bg)" stroke="url(#app_border)" stroke-width="2.5"/>
+  <rect x="11" y="11" width="42" height="29" rx="4" fill="#050811" stroke="#334155" stroke-width="1.8"/>
+  <path d="M32 40 L32 48" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
+  <path d="M23 48 L41 48" stroke="#475569" stroke-width="2.5" stroke-linecap="round"/>
+  <polyline points="15 25.5, 23 25.5, 27 17, 32 34, 37 20, 41 25.5, 49 25.5" fill="none" stroke="url(#app_pulse)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="37" cy="20" r="2" fill="#00F0FF"/>
+  <circle cx="32" cy="37" r="1" fill="#10B981"/>
+</svg>'''
+
 def get_svg_total(theme="dark"):
     # Icon: Server
     return _get_svg_wrapper('<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', theme)

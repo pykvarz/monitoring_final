@@ -20,7 +20,7 @@ from constants import (
     get_svg_total, get_svg_add_host, get_svg_add_group,
     get_svg_import, get_svg_export, get_svg_scan, get_svg_bulk,
     get_svg_settings, get_svg_delete, get_svg_history,
-    get_svg_pause, get_svg_play,
+    get_svg_pause, get_svg_play, get_svg_app_icon,
     COLOR_TOTAL
 )
 from ui_components import UIComponents
@@ -258,19 +258,26 @@ class ThemeManager:
 
     def set_window_icon(self, theme: str = "dark") -> None:
         """
-        Установка иконки главного окна
-        
-        Args:
-            theme: Название темы
+        Установка брендовой иконки главного окна и приложения
+        с поддержкой мультиразрешений для максимальной четкости в Taskbar Windows
         """
-        svg_data = get_svg_total(theme)
+        svg_data = get_svg_app_icon(theme)
         renderer = QSvgRenderer(QByteArray(svg_data.encode('utf-8')))
-        pixmap = QPixmap(32, 32)
-        pixmap.fill(Qt.transparent)
-        painter = QPainter(pixmap)
-        renderer.render(painter)
-        painter.end()
-        self._window.setWindowIcon(QIcon(pixmap))
+        icon = QIcon()
+        for size in (16, 20, 24, 32, 48, 64, 128, 256):
+            pixmap = QPixmap(size, size)
+            pixmap.fill(Qt.transparent)
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            renderer.render(painter)
+            painter.end()
+            icon.addPixmap(pixmap)
+
+        self._window.setWindowIcon(icon)
+        app = QApplication.instance()
+        if app:
+            app.setWindowIcon(icon)
 
     def apply_initial_theme(self) -> None:
         """Применение начальной темы при запуске приложения"""
