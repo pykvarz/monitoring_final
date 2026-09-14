@@ -126,11 +126,12 @@ class PingService(IPingService):
         import subprocess
         import platform
         
-        param = '-n' if platform.system().lower() == 'windows' else '-c'
-        timeout_ms = int(timeout * 1000)
-        timeout_param = '-w' if platform.system().lower() == 'windows' else '-W'
+        is_windows = platform.system().lower() == 'windows'
+        param = '-n' if is_windows else '-c'
+        timeout_param = '-w' if is_windows else '-W'
+        timeout_val = str(int(timeout * 1000)) if is_windows else str(max(1, int(round(timeout))))
         
-        command = ['ping', param, '1', timeout_param, str(timeout_ms), host]
+        command = ['ping', param, '1', timeout_param, timeout_val, host]
         
         try:
             creationflags = 0

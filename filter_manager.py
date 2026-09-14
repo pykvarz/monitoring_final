@@ -65,7 +65,7 @@ class FilterManager:
         # Получаем фильтры только если виджеты существуют
         group_filter = None
         if self._group_filter:
-            group_filter = self._group_filter.currentText().replace("📁 ", "")
+            group_filter = self._group_filter.currentText()
             if group_filter == "Все группы":
                 group_filter = None
         
@@ -177,7 +177,7 @@ class FilterManager:
 
     def get_current_group_filter(self) -> str:
         """Получение текущего фильтра по группе"""
-        return self._group_filter.currentText().replace("📁 ", "") if self._group_filter else "Все группы"
+        return self._group_filter.currentText() if self._group_filter else "Все группы"
 
     def get_current_status_filter(self) -> str:
         """Получение текущего фильтра по статусу"""

@@ -27,7 +27,10 @@ class TestValidateIP(unittest.TestCase):
             "8.8.8.8",
             "255.255.255.255",
             "0.0.0.0",
-            "127.0.0.1"
+            "127.0.0.1",
+            "::1",
+            "2001:db8::1",
+            "fe80::1"
         ]
         for ip in valid_ips:
             with self.subTest(ip=ip):
@@ -66,6 +69,8 @@ class TestValidateIPOrHostname(unittest.TestCase):
         """Test that valid IPs pass."""
         self.assertTrue(validate_ip_or_hostname("192.168.1.1"))
         self.assertTrue(validate_ip_or_hostname("8.8.8.8"))
+        self.assertTrue(validate_ip_or_hostname("::1"))
+        self.assertTrue(validate_ip_or_hostname("2001:db8::1"))
     
     def test_valid_hostnames(self):
         """Test valid hostnames."""
@@ -76,6 +81,9 @@ class TestValidateIPOrHostname(unittest.TestCase):
             "my-server.example.org",
             "server1.test",
             "localhost.localdomain",
+            "localhost",
+            "router",
+            "single",
         ]
         for hostname in valid_hostnames:
             with self.subTest(hostname=hostname):
@@ -93,7 +101,7 @@ class TestValidateIPOrHostname(unittest.TestCase):
             "a" * 64 + ".com",    # Label too long (>63)
             "a" * 254,            # Total too long (>253)
             "",                   # Empty
-            "single",             # Single label (we require at least 2 parts)
+            "12345",              # Purely numeric single label
             "in valid.com",       # Space in hostname
         ]
         for hostname in invalid:
@@ -217,7 +225,7 @@ class TestHostModel(unittest.TestCase):
         self.assertTrue(host.validate())
         
         # Manually corrupt the host (bypass __post_init__)
-        host.ip = "invalid"
+        host.ip = "invalid..host"
         self.assertFalse(host.validate())
     
     def test_host_id_auto_generation(self):

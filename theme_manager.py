@@ -226,38 +226,6 @@ class ThemeManager:
                 color = getattr(HostStatus, key.upper()).color
             label.setStyleSheet(get_stat_card_style(color, theme))
 
-    def _update_toolbar_buttons(self, theme: str) -> None:
-        """Обновление иконок и стилей кнопок тулбара"""
-        buttons_map = {
-            "добавить узел": get_svg_add_host,
-            "создать группу": get_svg_add_group,
-            "импорт": get_svg_import,
-            "экспорт": get_svg_export,
-            "проверить": get_svg_scan,
-            "массовые действия": get_svg_bulk,
-            "тема": get_svg_theme,
-            "настройки": get_svg_settings
-        }
-
-        for i in range(self._toolbar_layout.count()):
-            widget = self._toolbar_layout.itemAt(i).widget()
-            if isinstance(widget, QPushButton):
-                widget.setStyleSheet(get_button_style(theme))
-                btn_text = widget.text().lower().strip()
-                if btn_text in buttons_map:
-                    svg_func = buttons_map[btn_text]
-                    widget.setIcon(UIComponents._get_qicon(svg_func(theme)))
-
-    def _update_filter_buttons(self, theme: str) -> None:
-        """Обновление кнопок в панели фильтров"""
-        for i in range(self._filters_layout.count()):
-            item = self._filters_layout.itemAt(i)
-            if item.widget() and isinstance(item.widget(), QPushButton):
-                btn = item.widget()
-                btn.setStyleSheet(get_button_style(theme))
-                if "сбросить" in btn.text().lower():
-                    btn.setIcon(UIComponents._get_qicon(get_svg_delete(theme)))
-
     def set_window_icon(self, theme: str = "dark") -> None:
         """
         Установка брендовой иконки главного окна и приложения

@@ -569,6 +569,52 @@ class TestStorageMigrateToDbPreservesAddress(unittest.TestCase):
             TestFixtures.cleanup_db(db_manager)
 
 
+class TestIPv6AndSingleLabelValidation(unittest.TestCase):
+    """Регрессия MED-1: валидатор отклонял адреса IPv6 и однокомпонентные hostname (localhost, router)."""
+
+    def test_ipv6_addresses_accepted(self):
+        from models import validate_ip, validate_ip_or_hostname
+        for addr in ["::1", "fe80::1", "2001:db8::1"]:
+            with self.subTest(addr=addr):
+                self.assertTrue(validate_ip(addr), f"{addr} должен быть валидным IP")
+                self.assertTrue(validate_ip_or_hostname(addr), f"{addr} должен быть валидным IP/hostname")
+
+    def test_single_label_hostnames_accepted(self):
+        from models import validate_ip_or_hostname
+        for host in ["localhost", "router", "dc01", "nas"]:
+            with self.subTest(host=host):
+                self.assertTrue(validate_ip_or_hostname(host), f"{host} должен быть валидным hostname")
+
+    def test_numeric_single_label_rejected(self):
+        from models import validate_ip_or_hostname
+        self.assertFalse(validate_ip_or_hostname("12345"), "Числовой одиночный лейбл должен отклоняться")
+
+
+class TestLinuxSystemPingTimeout(unittest.TestCase):
+    """Регрессия LOW-2: на Linux системный ping ожидает таймаут в секундах (-W 2), а не миллисекундах (-W 2000)."""
+
+    def test_linux_ping_timeout_unit_seconds(self):
+        from services import PingService
+        from unittest.mock import patch, MagicMock
+
+        captured_command = []
+
+        def mock_run(cmd, **kwargs):
+            captured_command.extend(cmd)
+            m = MagicMock()
+            m.returncode = 0
+            return m
+
+        with patch("platform.system", return_value="Linux"), patch("subprocess.run", side_effect=mock_run):
+            PingService._system_ping("127.0.0.1", timeout=2.5)
+
+        self.assertIn("-c", captured_command)
+        self.assertIn("-W", captured_command)
+        w_idx = captured_command.index("-W")
+        timeout_arg = captured_command[w_idx + 1]
+        self.assertIn(timeout_arg, ["2", "3"], f"Таймаут должен быть в секундах, получен: {timeout_arg}")
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
 

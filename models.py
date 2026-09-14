@@ -6,6 +6,7 @@
 
 import re
 import uuid
+import ipaddress
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -14,7 +15,7 @@ from constants import SVG_ONLINE, SVG_OFFLINE, SVG_WAITING, SVG_MAINTENANCE
 
 
 def validate_ip_or_hostname(address: str) -> bool:
-    """Валидация IP-адреса или доменного имени"""
+    """Валидация IP-адреса (IPv4/IPv6) или доменного/сетевого имени"""
     if not address or not isinstance(address, str):
         return False
     
@@ -22,19 +23,18 @@ def validate_ip_or_hostname(address: str) -> bool:
     if len(address) > 253:  # Максимальная длина hostname
         return False
 
-    # Проверка IP адреса
+    # Проверка IP адреса (IPv4 / IPv6)
     if validate_ip(address):
         return True
     
     # Разделение на части по точкам
     parts = address.split('.')
     
-    if len(parts) < 2 or len(parts) > 127:
+    if len(parts) < 1 or len(parts) > 127:
         return False
 
-    # Если адрес состоит только из цифр во всех октетах или TLD состоит только из цифр,
-    # это не может быть валидным доменным именем (RFC 3696 / RFC 1123)
-    if all(part.isdigit() for part in parts) or parts[-1].isdigit():
+    # Если имя состоит только из цифр, это не валидный hostname (RFC 1123)
+    if all(part.isdigit() for part in parts) or (len(parts) > 1 and parts[-1].isdigit()):
         return False
     
     # Проверка доменного имени (RFC 1035 / RFC 1123)
@@ -54,27 +54,13 @@ def validate_ip_or_hostname(address: str) -> bool:
 
 
 def validate_ip(ip: str) -> bool:
-    """Валидация IP-адреса"""
+    """Валидация IP-адреса (IPv4 / IPv6)"""
     if not ip or not isinstance(ip, str):
         return False
     
     ip = ip.strip()
-    if len(ip) > 15:  # Максимальная длина IP адреса
-        return False
-
-    pattern = re.compile(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$')
-    match = pattern.match(ip)
-    if not match:
-        return False
-
     try:
-        for group in match.groups():
-            num = int(group)
-            if not 0 <= num <= 255:
-                return False
-            # Проверка на ведущие нули (кроме самого нуля)
-            if len(group) > 1 and group.startswith('0'):
-                return False
+        ipaddress.ip_address(ip)
         return True
     except ValueError:
         return False
