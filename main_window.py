@@ -129,13 +129,15 @@ class MainWindow(QMainWindow):
         msg = f"Заявка ({action}) для {host} успешно создана."
         if hasattr(self, '_toast_manager') and self._toast_manager:
             self._toast_manager.show_info("Helpdesk", msg)
-        NotificationService.show_notification("Helpdesk", msg)
+        else:
+            NotificationService.show_notification("Helpdesk", msg)
 
     def _on_helpdesk_ticket_failed(self, host: str, action: str, error_msg: str) -> None:
         msg = f"Не удалось создать заявку ({action}) для {host}:\n{error_msg}"
         if hasattr(self, '_toast_manager') and self._toast_manager:
             self._toast_manager.show_info("Ошибка Helpdesk", msg)
-        NotificationService.show_notification("Ошибка Helpdesk", msg)
+        else:
+            NotificationService.show_notification("Ошибка Helpdesk", msg)
 
     # ==================== ИНИЦИАЛИЗАЦИЯ ====================
 
@@ -512,15 +514,17 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(list)
     def _on_hosts_offline(self, offline_hosts: List[str]):
-        if hasattr(self, '_toast_manager') and self._toast_manager:
+        has_toast = hasattr(self, '_toast_manager') and self._toast_manager
+        if has_toast:
             self._toast_manager.show_offline(offline_hosts)
-        NotificationService.notify_offline_hosts(offline_hosts, self._config)
+        NotificationService.notify_offline_hosts(offline_hosts, self._config, show_tray=not has_toast)
 
     @pyqtSlot(list)
     def _on_hosts_recovered(self, recovered_hosts: List[str]):
-        if hasattr(self, '_toast_manager') and self._toast_manager:
+        has_toast = hasattr(self, '_toast_manager') and self._toast_manager
+        if has_toast:
             self._toast_manager.show_recovered(recovered_hosts)
-        NotificationService.notify_recovered_hosts(recovered_hosts, self._config)
+        NotificationService.notify_recovered_hosts(recovered_hosts, self._config, show_tray=not has_toast)
 
     def _update_status_bar(self, total: int = None):
         if total is None:
@@ -766,6 +770,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         logging.info("Application closing...")
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.close_all()
         if hasattr(self, '_content_splitter') and self._content_splitter:
             self._config.splitter_sizes = self._content_splitter.sizes()
             self._storage.save_config(self._config)

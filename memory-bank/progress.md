@@ -106,4 +106,10 @@
 - В table_model.py добавлен ToolTip для колонки «Время offline» с точной датой и временем начала сбоя («Недоступен с: ДД.ММ.ГГГГ ЧЧ:ММ:СС»).
 - Тестовый набор расширен до 173 тестов (167 passed, 6 skipped).
 
-
+2026-09-14 — Desktop Toast-баннеры и устранение дублирования уведомлений:
+- ToastNotification переведен в режим верхнеуровневого окна рабочего стола (Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoFocus) с аппаратной прозрачностью DWM (WA_TranslucentBackground, WA_ShowWithoutActivating).
+- Внутри окна сформирована карточка QFrame с мягким размытием тени QGraphicsDropShadowEffect без обрезки краями окна.
+- ToastManager рассчитывает координаты относительно availableGeometry экрана и позиционирует стек баннеров над панелью задач в правом нижнем углу.
+- В NotificationService добавлен параметр show_tray (по умолчанию True для тестов). При показе ToastManager дублирующий системный трей-баннер Windows отключается, звуковой сигнал сохраняется.
+- В MainWindow.closeEvent подключен close_all() для мгновенного закрытия активных карточек.
+- Тестовый набор расширен до 176 тестов (170 passed, 6 skipped).

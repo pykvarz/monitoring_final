@@ -80,6 +80,17 @@ class TestToastNotifications(unittest.TestCase):
             self.manager.show_info(f"Title {i}", f"Message {i}")
         self.assertLessEqual(len(self.manager._active_toasts), self.manager._max_toasts)
 
+    def test_manager_close_all(self):
+        """Проверка закрытия всех активных тостов"""
+        self.manager.show_info("Title 1", "Msg 1")
+        self.manager.show_info("Title 2", "Msg 2")
+        self.assertEqual(len(self.manager._active_toasts), 2)
+        self.manager.close_all()
+        # Все тосты переведены в состояние закрытия
+        for toast in self.manager._active_toasts:
+            self.assertTrue(toast._is_closing)
+
 
 if __name__ == '__main__':
     unittest.main()
+

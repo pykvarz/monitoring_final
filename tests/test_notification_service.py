@@ -154,6 +154,35 @@ class TestNotificationService(unittest.TestCase):
         except Exception as e:
             self.fail(f"Should handle error gracefully: {e}")
 
+    @patch.object(NotificationService, '_get_tray_icon')
+    @patch('services.QApplication.beep')
+    def test_notify_offline_hosts_show_tray_false(self, mock_beep, mock_get_tray):
+        """Test notify_offline_hosts does not call tray.showMessage when show_tray is False, but still beeps if sound is enabled."""
+        mock_tray = MagicMock()
+        mock_get_tray.return_value = mock_tray
+
+        config = AppConfig(notifications_enabled=True, sound_enabled=True)
+        hosts = ["Server1"]
+
+        NotificationService.notify_offline_hosts(hosts, config, show_tray=False)
+
+        mock_beep.assert_called_once()
+        mock_tray.showMessage.assert_not_called()
+
+    @patch.object(NotificationService, '_get_tray_icon')
+    def test_notify_recovered_hosts_show_tray_false(self, mock_get_tray):
+        """Test notify_recovered_hosts does not call tray.showMessage when show_tray is False."""
+        mock_tray = MagicMock()
+        mock_get_tray.return_value = mock_tray
+
+        config = AppConfig(notifications_enabled=True, sound_enabled=False)
+        hosts = ["Server1"]
+
+        NotificationService.notify_recovered_hosts(hosts, config, show_tray=False)
+
+        mock_tray.showMessage.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()
+

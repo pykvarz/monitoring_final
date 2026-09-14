@@ -57,13 +57,26 @@ class INotificationService(ABC):
     """Интерфейс для отправки уведомлений"""
     
     @abstractmethod
-    def notify_offline_hosts(self, offline_hosts: List[str], config: AppConfig) -> None:
+    def notify_offline_hosts(self, offline_hosts: List[str], config: AppConfig, show_tray: bool = True) -> None:
         """
         Отправка уведомления о недоступных хостах
         
         Args:
             offline_hosts: Список названий недоступных хостов
             config: Конфигурация приложения
+            show_tray: Показывать ли системное трей-уведомление Windows
+        """
+        pass
+
+    @abstractmethod
+    def notify_recovered_hosts(self, recovered_hosts: List[str], config: AppConfig, show_tray: bool = True) -> None:
+        """
+        Отправка уведомления о восстановившихся хостах
+        
+        Args:
+            recovered_hosts: Список названий восстановившихся хостов
+            config: Конфигурация приложения
+            show_tray: Показывать ли системное трей-уведомление Windows
         """
         pass
     
@@ -77,3 +90,4 @@ class INotificationService(ABC):
             message: Текст сообщения
         """
         pass
+

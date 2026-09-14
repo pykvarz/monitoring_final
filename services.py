@@ -40,7 +40,7 @@ class NotificationService(INotificationService):
         return cls._tray_icon
 
     @staticmethod
-    def notify_offline_hosts(hosts: List[str], config: AppConfig) -> None:
+    def notify_offline_hosts(hosts: List[str], config: AppConfig, show_tray: bool = True) -> None:
         """Отправка уведомлений об упавших узлах"""
         if not hosts or not config.notifications_enabled:
             return
@@ -56,15 +56,16 @@ class NotificationService(INotificationService):
             if config.sound_enabled:
                 QApplication.beep()
 
-            tray = NotificationService._get_tray_icon()
-            if tray:
-                tray.showMessage(title, message, QSystemTrayIcon.Information, 5000)
+            if show_tray:
+                tray = NotificationService._get_tray_icon()
+                if tray:
+                    tray.showMessage(title, message, QSystemTrayIcon.Information, 5000)
 
         except Exception as e:
             logging.error(f"Ошибка отправки уведомления: {e}", exc_info=True)
 
     @staticmethod
-    def notify_recovered_hosts(hosts: List[str], config: AppConfig) -> None:
+    def notify_recovered_hosts(hosts: List[str], config: AppConfig, show_tray: bool = True) -> None:
         """Отправка уведомлений о восстановившихся узлах"""
         if not hosts or not config.notifications_enabled:
             return
@@ -80,9 +81,10 @@ class NotificationService(INotificationService):
             if config.sound_enabled:
                 QApplication.beep()
 
-            tray = NotificationService._get_tray_icon()
-            if tray:
-                tray.showMessage(title, message, QSystemTrayIcon.Information, 5000)
+            if show_tray:
+                tray = NotificationService._get_tray_icon()
+                if tray:
+                    tray.showMessage(title, message, QSystemTrayIcon.Information, 5000)
 
         except Exception as e:
             logging.error(f"Ошибка отправки уведомления: {e}", exc_info=True)

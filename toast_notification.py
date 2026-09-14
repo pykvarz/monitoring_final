@@ -37,15 +37,16 @@ class ToastNotification(QFrame):
 
     def __init__(
         self,
-        parent: QWidget,
-        toast_type: str,
-        title: str,
+        parent: Optional[QWidget] = None,
+        toast_type: str = ToastType.INFO,
+        title: str = "",
         message: str = "",
         hosts: Optional[List[str]] = None,
         duration_ms: int = 6000,
         theme: str = "dark"
     ):
-        super().__init__(parent)
+        flags = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoFocus
+        super().__init__(parent, flags)
         self._toast_type = toast_type
         self._title = title
         self._message = message
@@ -53,6 +54,9 @@ class ToastNotification(QFrame):
         self._duration_ms = duration_ms
         self._theme = theme
         self._is_closing = False
+
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
 
         self._init_ui()
         self._init_animations()
@@ -133,11 +137,15 @@ class ToastNotification(QFrame):
 
     def _init_ui(self):
         c = self._get_colors()
-        self.setFixedWidth(360)
         self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setStyleSheet("ToastNotification { background: transparent; border: none; }")
 
-        self.setStyleSheet(f"""
-            ToastNotification {{
+        # Внутренняя карточка со стилями, рамкой и скруглениями
+        self._card = QFrame(self)
+        self._card.setObjectName("toast_card")
+        self._card.setFixedWidth(360)
+        self._card.setStyleSheet(f"""
+            QFrame#toast_card {{
                 background-color: {c['bg']};
                 border: 1px solid {c['border']};
                 border-left: 5px solid {c['accent']};
@@ -145,16 +153,23 @@ class ToastNotification(QFrame):
             }}
         """)
 
-        # Тень
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(18)
-        shadow.setOffset(0, 4)
+        # Тень на карточке (мягко размывается в пределах прозрачных отступов окна)
+        shadow = QGraphicsDropShadowEffect(self._card)
+        shadow.setBlurRadius(16)
+        shadow.setOffset(0, 3)
         shadow.setColor(c['shadow'])
-        self.setGraphicsEffect(shadow)
+        self._card.setGraphicsEffect(shadow)
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(12, 10, 12, 10)
-        main_layout.setSpacing(6)
+        # Корневой layout с отступами под размытие тени
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(10, 10, 10, 10)
+        root_layout.setSpacing(0)
+        root_layout.addWidget(self._card)
+
+        # Layout внутри карточки
+        card_layout = QVBoxLayout(self._card)
+        card_layout.setContentsMargins(12, 10, 12, 10)
+        card_layout.setSpacing(6)
 
         # Верхняя строка: Иконка + Заголовок + Время + Кнопка закрытия
         top_row = QHBoxLayout()
@@ -209,7 +224,7 @@ class ToastNotification(QFrame):
         btn_close.clicked.connect(self.close_toast)
         top_row.addWidget(btn_close)
 
-        main_layout.addLayout(top_row)
+        card_layout.addLayout(top_row)
 
         # Сообщение или теги узлов
         if self._hosts:
@@ -250,22 +265,21 @@ class ToastNotification(QFrame):
                 hosts_layout.addWidget(more_tag)
 
             hosts_layout.addStretch()
-            main_layout.addLayout(hosts_layout)
+            card_layout.addLayout(hosts_layout)
 
         elif self._message:
             msg_lbl = QLabel(self._message)
             msg_lbl.setWordWrap(True)
             msg_lbl.setStyleSheet(f"color: {c['text_color']}; font-size: 11px; margin-left: 34px; border: none; background: transparent;")
-            main_layout.addWidget(msg_lbl)
+            card_layout.addWidget(msg_lbl)
 
+        self._card.adjustSize()
         self.adjustSize()
 
     def _init_animations(self):
         """Настройка плавного появления"""
-        self._opacity_effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self._opacity_effect)
-
-        self._fade_anim = QPropertyAnimation(self._opacity_effect, b"opacity")
+        self.setWindowOpacity(0.0)
+        self._fade_anim = QPropertyAnimation(self, b"windowOpacity")
         self._fade_anim.setDuration(220)
         self._fade_anim.setStartValue(0.0)
         self._fade_anim.setEndValue(1.0)
@@ -292,9 +306,9 @@ class ToastNotification(QFrame):
         self._is_closing = True
         self._timer.stop()
 
-        self._close_anim = QPropertyAnimation(self._opacity_effect, b"opacity")
+        self._close_anim = QPropertyAnimation(self, b"windowOpacity")
         self._close_anim.setDuration(200)
-        self._close_anim.setStartValue(self._opacity_effect.opacity())
+        self._close_anim.setStartValue(self.windowOpacity())
         self._close_anim.setEndValue(0.0)
         self._close_anim.setEasingCurve(QEasingCurve.InCubic)
         self._close_anim.finished.connect(self._on_closed)
@@ -319,8 +333,8 @@ class ToastNotification(QFrame):
 
 class ToastManager(QObject):
     """
-    Менеджер всплывающих уведомлений для главного окна:
-    - Стек уведомлений в правом нижнем углу
+    Менеджер всплывающих уведомлений на рабочем столе:
+    - Стек Desktop-уведомлений в правом нижнем углу над панелью задач
     - Автоматический пересчет позиций
     - Поддержка тем оформления
     """
@@ -409,23 +423,43 @@ class ToastManager(QObject):
             self._active_toasts.remove(toast)
         self.reposition_toasts()
 
+    def close_all(self):
+        """Закрыть все активные уведомления"""
+        for toast in list(self._active_toasts):
+            toast.close_toast()
+
     def reposition_toasts(self):
-        """Пересчет позиций всех активных тостов (снизу вверх)"""
-        if not self._parent:
-            return
+        """Пересчет позиций всех активных тостов на рабочем столе (снизу вверх над панелью задач)"""
+        from PyQt5.QtWidgets import QApplication
+        app = QApplication.instance()
+        screen = None
+        if self._parent and hasattr(self._parent, "windowHandle") and self._parent.windowHandle():
+            screen = self._parent.windowHandle().screen()
+        if not screen and app:
+            screen = app.primaryScreen()
 
-        parent_rect = self._parent.rect()
-        margin_right = 24
-        margin_bottom = 36  # над статус баром
-        spacing = 10
+        if screen:
+            geo = screen.availableGeometry()
+        elif hasattr(self._parent, "screen") and self._parent and self._parent.screen():
+            geo = self._parent.screen().availableGeometry()
+        elif self._parent and hasattr(self._parent, "rect"):
+            geo = self._parent.rect()
+        else:
+            from PyQt5.QtWidgets import QDesktopWidget
+            geo = QDesktopWidget().availableGeometry()
 
-        curr_y = parent_rect.height() - margin_bottom
+        margin_right = 16
+        margin_bottom = 16
+        spacing = 8
+
+        curr_y = geo.bottom() - margin_bottom
 
         for toast in reversed(self._active_toasts):
-            toast_h = toast.sizeHint().height() or toast.height()
-            toast_w = toast.width()
-            target_x = parent_rect.width() - toast_w - margin_right
+            toast_h = toast.sizeHint().height() or toast.height() or 70
+            toast_w = toast.width() or 380
+            target_x = geo.right() - toast_w - margin_right
             target_y = curr_y - toast_h
 
             toast.move(target_x, target_y)
             curr_y = target_y - spacing
+
