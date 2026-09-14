@@ -181,6 +181,9 @@ class AppConfig:
     custom_groups: List[str] = field(default_factory=list)
     history_retention_days: int = 90  # 0 = хранить бессрочно
     splitter_sizes: List[int] = field(default_factory=list)
+    event_log_floating: bool = False
+    event_log_on_top: bool = True
+    event_log_geometry: List[int] = field(default_factory=list)
     helpdesk_enabled: bool = False
     helpdesk_url: str = ""
     helpdesk_reasons: List[str] = field(default_factory=lambda: ["без связи", "ошибка пинга", "техническое обслуживание"])

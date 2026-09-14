@@ -118,3 +118,10 @@
 - Устранены белые полосы сверху/снизу и системные артефакты Windows: вызовы combo.setView(QListView()) в UIComponents.setup_combobox отключают нативный QComboBoxPrivateContainer.
 - В constants.py обновлен get_combobox_style для тем Dark и Tactical NOC: добавлены стилизованный QListView, CSS-стрелка down-arrow, скругления, отступы, подсветка при фокусе и кастомный тонкий скроллбар.
 - Единая стилизация применена ко всем комбобоксам приложения: фильтр групп в тулбаре, выбор статуса в EventLogPanel, выбор группы и статуса в HistoryDialog, группа в HostDialog и выбор темы в SettingsDialog.
+
+2026-09-14 — плавающее HUD-окно журнала событий (Always on Top):
+- Реализован класс FloatingEventLogWindow: верхнеуровневое окно рабочего стола с DWM Dark Titlebar, иконкой и режимом Qt.WindowStaysOnTopHint.
+- В шапку EventLogPanel добавлены кнопка открепления/прикрепления (⤢ / 🗗) и кнопка-булавка (📌) для быстрого переключения режима «Поверх всех окон».
+- В MainWindow реализована бесшовная миграция виджета EventLogPanel между сплиттером и плавающим окном с сохранением таймеров, авто-обновления и контекстного меню по ПКМ.
+- В AppConfig добавлены поля сохранения состояния: event_log_floating, event_log_on_top и event_log_geometry.
+- Тестовый набор расширен до 182 тестов (176 passed, 6 skipped).

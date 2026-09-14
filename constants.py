@@ -862,6 +862,22 @@ def get_svg_theme(theme="light"):
 def get_svg_ping(theme="dark"):
     return _get_svg_wrapper('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>', theme)
 
+def get_svg_popout(theme="dark"):
+    return _get_svg_wrapper('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>', theme)
+
+def get_svg_dock(theme="dark"):
+    return _get_svg_wrapper('<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>', theme)
+
+def get_svg_pin(theme="dark", pinned=False):
+    if pinned:
+        color = "#3b82f6" if theme != "tactical" else "#39FF14"
+        return f"""
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="{color}" stroke="{color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+        </svg>
+        """
+    return _get_svg_wrapper('<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>', theme)
+
 def get_svg_app_icon(theme="dark"):
     """Брендовая иконка приложения Network Monitor: контрастный темный бейдж, дисплей монитора и неоновый пульс активности сети"""
     return '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">

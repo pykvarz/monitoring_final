@@ -151,6 +151,8 @@ class ThemeManager:
             
         if hasattr(self._window, '_event_log_panel') and self._window._event_log_panel:
             self._window._event_log_panel.set_theme(theme)
+        if hasattr(self._window, '_floating_event_log') and self._window._floating_event_log:
+            self._window._floating_event_log.set_theme(theme)
         
         # Обновляем карточки в дашборде
         if self._dashboard_labels:

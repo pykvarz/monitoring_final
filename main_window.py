@@ -33,7 +33,7 @@ from dialogs import SettingsDialog
 from ui_components import UIComponents
 from host_manager import HostManager
 from table_model import CenteredIconDelegate
-from history_views import HistoryDialog, EventLogPanel
+from history_views import HistoryDialog, EventLogPanel, FloatingEventLogWindow
 
 # Менеджеры
 from filter_manager import FilterManager
@@ -344,8 +344,20 @@ class MainWindow(QMainWindow):
         self._content_splitter.addWidget(self._event_log_panel)
         self._content_splitter.setStretchFactor(0, 1)
         self._content_splitter.setStretchFactor(1, 0)
-        self._content_splitter.setSizes([950, 320])
+        default_sizes = [950, 320]
+        saved_sizes = getattr(self._config, 'splitter_sizes', None)
+        if saved_sizes and len(saved_sizes) == 2 and sum(saved_sizes) > 0:
+            self._content_splitter.setSizes(saved_sizes)
+        else:
+            self._content_splitter.setSizes(default_sizes)
+        self._last_splitter_sizes = default_sizes
         self._main_layout.addWidget(self._content_splitter, 1)
+
+        # Создаем плавающее HUD-окно для журнала событий
+        self._floating_event_log = FloatingEventLogWindow(parent=None, theme=theme)
+        self._floating_event_log.dock_requested.connect(self._dock_event_log)
+        self._event_log_panel.dock_toggle_requested.connect(self._toggle_event_log_dock)
+        self._event_log_panel.pin_toggle_requested.connect(self._toggle_event_log_pin)
 
         # === Статус бар ===
         self._status_label = QLabel("Инициализация...")
@@ -392,6 +404,10 @@ class MainWindow(QMainWindow):
         # EventLogPanel - подключаем repository и запускаем
         self._event_log_panel._repository = self._repository
         self._event_log_panel.refresh()
+
+        # Если в конфигурации сохранено, что журнал был откреплен
+        if getattr(self._config, 'event_log_floating', False):
+            self._undock_event_log()
         
         # Export/Import Manager
         self._export_import_manager = ExportImportManager(self, self._repository)
@@ -642,6 +658,69 @@ class MainWindow(QMainWindow):
         self._history_dialog.raise_()
         self._history_dialog.activateWindow()
 
+    def _toggle_event_log_dock(self):
+        """Переключение между встроенным и плавающим режимом журнала событий"""
+        if self._event_log_panel.is_floating:
+            self._dock_event_log()
+        else:
+            self._undock_event_log()
+
+    def _undock_event_log(self):
+        """Открепление журнала событий в отдельное плавающее HUD-окно"""
+        sizes = self._content_splitter.sizes()
+        if len(sizes) >= 2 and sizes[1] > 0:
+            self._last_splitter_sizes = sizes
+        elif not hasattr(self, '_last_splitter_sizes') or not self._last_splitter_sizes:
+            self._last_splitter_sizes = [950, 320]
+
+        # Извлекаем панель из сплиттера и переносим в плавающее окно
+        if self._content_splitter.count() > 1:
+            w = self._content_splitter.widget(1)
+            if w == self._event_log_panel:
+                w.setParent(None)
+        self._floating_event_log.set_panel(self._event_log_panel)
+
+        # Таблица хостов занимает всю ширину сплиттера
+        self._content_splitter.setSizes([sum(self._last_splitter_sizes), 0])
+
+        on_top = getattr(self._config, 'event_log_on_top', True)
+        self._event_log_panel.set_floating_mode(True, is_pinned=on_top)
+        self._floating_event_log.set_on_top(on_top)
+
+        # Восстановление сохраненной геометрии
+        geom = getattr(self._config, 'event_log_geometry', None)
+        if geom and len(geom) == 4:
+            self._floating_event_log.setGeometry(geom[0], geom[1], geom[2], geom[3])
+
+        self._floating_event_log.show()
+        self._floating_event_log.raise_()
+        self._floating_event_log.activateWindow()
+
+        self._config.event_log_floating = True
+        self._storage.save_config(self._config)
+
+    def _dock_event_log(self):
+        """Прикрепление журнала событий обратно в правый сплиттер главного окна"""
+        rect = self._floating_event_log.geometry()
+        self._config.event_log_geometry = [rect.x(), rect.y(), rect.width(), rect.height()]
+        self._config.event_log_floating = False
+        self._storage.save_config(self._config)
+
+        panel = self._floating_event_log.take_panel()
+        if panel:
+            panel.set_floating_mode(False)
+            self._content_splitter.addWidget(panel)
+            sizes = getattr(self, '_last_splitter_sizes', None) or [950, 320]
+            self._content_splitter.setSizes(sizes)
+
+        self._floating_event_log.hide()
+
+    def _toggle_event_log_pin(self, pinned: bool):
+        """Переключение режима 'Поверх всех окон' для плавающего журнала"""
+        self._config.event_log_on_top = pinned
+        self._floating_event_log.set_on_top(pinned)
+        self._storage.save_config(self._config)
+
     def _open_settings(self):
         dialog = SettingsDialog(self, self._config)
         if dialog.exec_() == QDialog.Accepted:
@@ -770,11 +849,19 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         logging.info("Application closing...")
+        if hasattr(self, '_floating_event_log') and self._floating_event_log:
+            if getattr(self, '_event_log_panel', None) and self._event_log_panel.is_floating:
+                rect = self._floating_event_log.geometry()
+                self._config.event_log_geometry = [rect.x(), rect.y(), rect.width(), rect.height()]
+                self._config.event_log_floating = True
+                self._storage.save_config(self._config)
+            self._floating_event_log.close()
         if hasattr(self, '_toast_manager') and self._toast_manager:
             self._toast_manager.close_all()
         if hasattr(self, '_content_splitter') and self._content_splitter:
-            self._config.splitter_sizes = self._content_splitter.sizes()
-            self._storage.save_config(self._config)
+            if not getattr(self, '_event_log_panel', None) or not self._event_log_panel.is_floating:
+                self._config.splitter_sizes = self._content_splitter.sizes()
+                self._storage.save_config(self._config)
         if self._monitor_thread:
             self._monitor_thread.stop()
         if hasattr(self, '_db_manager'):

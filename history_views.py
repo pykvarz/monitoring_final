@@ -21,6 +21,7 @@ from PyQt5.QtGui import QColor, QBrush
 from models import HostStatus
 from constants import (
     get_table_style, get_svg_delete, get_svg_refresh,
+    get_svg_popout, get_svg_dock, get_svg_pin, get_svg_app_icon,
     get_combobox_style, get_main_style, get_button_style,
     COLOR_ONLINE, COLOR_OFFLINE, COLOR_WAITING, COLOR_MAINTENANCE
 )
@@ -166,6 +167,8 @@ class EventLogPanel(QFrame):
     """
 
     host_context_menu_requested = pyqtSignal(str, QPoint)
+    dock_toggle_requested = pyqtSignal()
+    pin_toggle_requested = pyqtSignal(bool)
 
     STATUS_FILTER_OPTIONS = [
         ("Все", None),
@@ -179,8 +182,12 @@ class EventLogPanel(QFrame):
         super().__init__(parent)
         self._repository = repository
         self._theme = theme
+        self.is_floating = False
+        self.is_pinned = True
         self._btn_clear = None
         self._btn_refresh = None
+        self._btn_pin = None
+        self._btn_dock = None
         self._init_ui()
 
         self._refresh_timer = QTimer(self)
@@ -207,14 +214,14 @@ class EventLogPanel(QFrame):
             }}
         """)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 10)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 8)
+        layout.setSpacing(6)
 
         # Заголовок + Фильтр + кнопки
         header_row = QHBoxLayout()
-        header_row.setSpacing(6)
+        header_row.setSpacing(4)
         title = QLabel("Журнал событий")
-        title.setStyleSheet(f"font-weight: bold; font-size: 14px; color: {'#f1f5f9' if is_dark else '#1e293b'}; border: none; background: transparent;")
+        title.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {'#f1f5f9' if is_dark else '#1e293b'}; border: none; background: transparent;")
         header_row.addWidget(title)
         header_row.addStretch()
 
@@ -223,7 +230,7 @@ class EventLogPanel(QFrame):
         for label, _ in self.STATUS_FILTER_OPTIONS:
             self._status_combo.addItem(label)
         self._status_combo.currentIndexChanged.connect(self.refresh)
-        self._status_combo.setMaximumWidth(110)
+        self._status_combo.setMaximumWidth(95)
         self._status_combo.setFixedHeight(26)
         header_row.addWidget(self._status_combo)
 
@@ -266,6 +273,19 @@ class EventLogPanel(QFrame):
         self._btn_refresh.setStyleSheet(btn_style_refresh)
         self._btn_refresh.clicked.connect(self.refresh)
         header_row.addWidget(self._btn_refresh)
+
+        self._btn_pin = QPushButton()
+        self._btn_pin.setFixedSize(26, 26)
+        self._btn_pin.clicked.connect(self._on_pin_clicked)
+        self._btn_pin.setVisible(False)
+        header_row.addWidget(self._btn_pin)
+
+        self._btn_dock = QPushButton()
+        self._btn_dock.setFixedSize(26, 26)
+        self._btn_dock.clicked.connect(self.dock_toggle_requested.emit)
+        header_row.addWidget(self._btn_dock)
+
+        self._update_dock_buttons()
 
         layout.addLayout(header_row)
 
@@ -418,7 +438,69 @@ class EventLogPanel(QFrame):
             self._status_combo.setStyleSheet(get_combobox_style(theme))
         if hasattr(self, '_list') and self._list:
             self._list.setStyleSheet(self._get_list_style(theme))
+        self._update_dock_buttons()
         self.refresh()
+
+    def set_floating_mode(self, is_floating: bool, is_pinned: bool = True):
+        """Переключение между встроенным режимом (в сплиттере) и плавающим HUD"""
+        self.is_floating = is_floating
+        self.is_pinned = is_pinned
+        if hasattr(self, '_btn_pin') and self._btn_pin:
+            self._btn_pin.setVisible(is_floating)
+        self._update_dock_buttons()
+
+    def _on_pin_clicked(self):
+        """Клик по булавке 'Поверх всех окон'"""
+        self.is_pinned = not self.is_pinned
+        self._update_dock_buttons()
+        self.pin_toggle_requested.emit(self.is_pinned)
+
+    def _update_dock_buttons(self):
+        """Обновление стилей и иконок кнопок открепления и булавки"""
+        is_dark = self._theme in ("dark", "tactical")
+        btn_base = f"""
+            QPushButton {{
+                background-color: {'#1e222b' if is_dark else '#f8fafc'};
+                border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
+                border-radius: 5px;
+                padding: 3px;
+            }}
+            QPushButton:hover {{
+                background-color: {'#172554' if is_dark else '#eff6ff'};
+                border-color: #3b82f6;
+            }}
+        """
+
+        if hasattr(self, '_btn_dock') and self._btn_dock:
+            self._btn_dock.setStyleSheet(btn_base)
+            if self.is_floating:
+                self._btn_dock.setToolTip("Прикрепить обратно к главному окну")
+                self._btn_dock.setIcon(UIComponents._get_qicon(get_svg_dock(self._theme), 14))
+            else:
+                self._btn_dock.setToolTip("Открепить в плавающее окно (HUD)")
+                self._btn_dock.setIcon(UIComponents._get_qicon(get_svg_popout(self._theme), 14))
+
+        if hasattr(self, '_btn_pin') and self._btn_pin:
+            pin_border = '#39FF14' if self._theme == 'tactical' else '#3b82f6'
+            if self.is_pinned:
+                self._btn_pin.setToolTip("Отключить 'Поверх всех окон'")
+                self._btn_pin.setIcon(UIComponents._get_qicon(get_svg_pin(self._theme, True), 14))
+                self._btn_pin.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {'#172554' if is_dark else '#eff6ff'};
+                        border: 1px solid {pin_border};
+                        border-radius: 5px;
+                        padding: 3px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {'#1e3a8a' if is_dark else '#dbeafe'};
+                        border-color: {pin_border};
+                    }}
+                """)
+            else:
+                self._btn_pin.setToolTip("Включить 'Поверх всех окон'")
+                self._btn_pin.setIcon(UIComponents._get_qicon(get_svg_pin(self._theme, False), 14))
+                self._btn_pin.setStyleSheet(btn_base)
 
     @staticmethod
     def _get_list_style(theme: str) -> str:
@@ -469,6 +551,97 @@ class EventLogPanel(QFrame):
                 background: none;
             }}
         """
+
+
+class FloatingEventLogWindow(QWidget):
+    """
+    Плавающее верхнеуровневое HUD-окно журнала событий с режимом 'Поверх всех окон'.
+    Позволяет операторам непрерывно наблюдать за потоком сбоев/восстановлений узлов
+    поверх любых приложений, даже когда главное окно свернуто.
+    """
+
+    dock_requested = pyqtSignal()
+
+    def __init__(self, parent=None, theme: str = "dark"):
+        super().__init__(parent, Qt.Window)
+        self._theme = theme
+        self._panel: Optional[EventLogPanel] = None
+        self._on_top = True
+
+        self.setWindowTitle("Журнал событий — Live Feed")
+        self.resize(360, 520)
+        self.setMinimumSize(280, 300)
+
+        self._set_window_icon()
+        set_dark_titlebar(self, self._theme in ("dark", "tactical"))
+
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(0)
+
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, self._on_top)
+
+    def _set_window_icon(self):
+        """Установка иконки окна из фирменного SVG"""
+        from PyQt5.QtGui import QIcon, QPixmap, QPainter
+        from PyQt5.QtSvg import QSvgRenderer
+        from PyQt5.QtCore import QByteArray
+        svg_data = get_svg_app_icon(self._theme)
+        renderer = QSvgRenderer(QByteArray(svg_data.encode('utf-8')))
+        pixmap = QPixmap(32, 32)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.end()
+        self.setWindowIcon(QIcon(pixmap))
+
+    def set_panel(self, panel: EventLogPanel):
+        """Перенос панели журнала внутрь плавающего окна"""
+        if self._panel and self._panel != panel:
+            self.take_panel()
+        self._panel = panel
+        panel.setParent(self)
+        self._layout.addWidget(panel)
+        panel.show()
+
+    def take_panel(self) -> Optional[EventLogPanel]:
+        """Извлечение панели для возврата в главное окно"""
+        if self._panel:
+            panel = self._panel
+            self._layout.removeWidget(panel)
+            panel.setParent(None)
+            self._panel = None
+            return panel
+        return None
+
+    def current_panel(self) -> Optional[EventLogPanel]:
+        return self._panel
+
+    def set_on_top(self, on_top: bool):
+        """Включение/выключение флага 'Поверх всех окон'"""
+        self._on_top = on_top
+        geom = self.geometry()
+        was_visible = self.isVisible()
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, on_top)
+        self.setGeometry(geom)
+        if was_visible:
+            self.show()
+            self.raise_()
+
+    def is_on_top(self) -> bool:
+        return self._on_top
+
+    def set_theme(self, theme: str):
+        self._theme = theme
+        self._set_window_icon()
+        set_dark_titlebar(self, theme in ("dark", "tactical"))
+        if self._panel:
+            self._panel.set_theme(theme)
+
+    def closeEvent(self, event):
+        """При закрытии плавающего окна возвращаем панель в главное окно"""
+        self.dock_requested.emit()
+        event.accept()
 
 
 class HistoryDialog(QDialog):
