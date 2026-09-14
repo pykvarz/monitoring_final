@@ -118,21 +118,29 @@ class TestFormatOfflineTime(unittest.TestCase):
     
     def test_seconds_only(self):
         """Test durations less than a minute."""
-        self.assertEqual(format_offline_time(timedelta(seconds=30)), "< 1 м")
-        self.assertEqual(format_offline_time(timedelta(seconds=59)), "< 1 м")
+        self.assertEqual(format_offline_time(timedelta(seconds=30)), "< 1 мин")
+        self.assertEqual(format_offline_time(timedelta(seconds=59)), "< 1 мин")
     
     def test_minutes_only(self):
         """Test durations in minutes."""
-        self.assertEqual(format_offline_time(timedelta(minutes=5)), "5 м")
-        self.assertEqual(format_offline_time(timedelta(minutes=30)), "30 м")
-        self.assertEqual(format_offline_time(timedelta(minutes=59)), "59 м")
+        self.assertEqual(format_offline_time(timedelta(minutes=5)), "5 мин")
+        self.assertEqual(format_offline_time(timedelta(minutes=30)), "30 мин")
+        self.assertEqual(format_offline_time(timedelta(minutes=59)), "59 мин")
     
     def test_hours_and_minutes(self):
         """Test durations with hours."""
-        self.assertEqual(format_offline_time(timedelta(hours=1)), "01:00")
-        self.assertEqual(format_offline_time(timedelta(hours=2, minutes=30)), "02:30")
-        self.assertEqual(format_offline_time(timedelta(hours=24, minutes=5)), "24:05")
-        self.assertEqual(format_offline_time(timedelta(hours=100)), "100:00")
+        self.assertEqual(format_offline_time(timedelta(hours=1)), "1 ч")
+        self.assertEqual(format_offline_time(timedelta(hours=2, minutes=30)), "2 ч 30 мин")
+        self.assertEqual(format_offline_time(timedelta(hours=23, minutes=59)), "23 ч 59 мин")
+
+    def test_days_hours_and_minutes(self):
+        """Test durations with days, hours, and minutes."""
+        self.assertEqual(format_offline_time(timedelta(hours=24)), "1 д")
+        self.assertEqual(format_offline_time(timedelta(hours=24, minutes=5)), "1 д 5 мин")
+        self.assertEqual(format_offline_time(timedelta(days=1, hours=4, minutes=15)), "1 д 4 ч 15 мин")
+        self.assertEqual(format_offline_time(timedelta(days=2, hours=10)), "2 д 10 ч")
+        self.assertEqual(format_offline_time(timedelta(hours=100)), "4 д 4 ч")
+
 
 
 class TestHostModel(unittest.TestCase):

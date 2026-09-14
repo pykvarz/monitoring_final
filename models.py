@@ -81,21 +81,30 @@ def validate_ip(ip: str) -> bool:
 
 
 def format_offline_time(duration: timedelta) -> str:
-    """Форматирование времени простоя"""
+    """Форматирование времени простоя (дни, часы, минуты)"""
     total_seconds = int(duration.total_seconds())
     if total_seconds <= 0:
         return ""
 
-    hours = total_seconds // 3600
+    days = total_seconds // 86400
+    hours = (total_seconds % 86400) // 3600
     minutes = (total_seconds % 3600) // 60
-    seconds = total_seconds % 60
 
-    if hours > 0:
-        return f"{hours:02d}:{minutes:02d}"
+    if days > 0:
+        parts = [f"{days} д"]
+        if hours > 0:
+            parts.append(f"{hours} ч")
+        if minutes > 0:
+            parts.append(f"{minutes} мин")
+        return " ".join(parts)
+    elif hours > 0:
+        if minutes > 0:
+            return f"{hours} ч {minutes} мин"
+        return f"{hours} ч"
     elif minutes > 0:
-        return f"{minutes} м"
+        return f"{minutes} мин"
     else:
-        return "< 1 м"
+        return "< 1 мин"
 
 
 

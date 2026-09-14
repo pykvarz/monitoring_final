@@ -217,6 +217,16 @@ class HostTableModel(QAbstractTableModel):
                 return HostStatus[host.status].title
             elif col == 1:
                 return "Уведомления включены" if host.notifications_enabled else "Уведомления отключены"
+            elif col == 5:
+                if host.status in ("OFFLINE", "WAITING") and host.offline_since:
+                    try:
+                        dt = datetime.fromisoformat(host.offline_since)
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        local_dt = dt.astimezone()
+                        return f"Недоступен с: {local_dt.strftime('%d.%m.%Y %H:%M:%S')}"
+                    except (ValueError, TypeError):
+                        return f"Недоступен с: {host.offline_since}"
 
         return QVariant()
 

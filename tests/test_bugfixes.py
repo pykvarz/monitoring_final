@@ -345,7 +345,25 @@ class TestTableSortWithHostnames(unittest.TestCase):
         hosts_desc = [model.get_host(i).ip for i in range(model.rowCount())]
         self.assertEqual(len(hosts_desc), 4)
 
+class TestOfflineTimeTooltip(unittest.TestCase):
+    """Проверка подсказки ToolTip для колонки времени простоя (колонка 5)."""
+
+    @classmethod
+    def setUpClass(cls):
+        TestFixtures.setup_qapp()
+
+    def test_offline_time_tooltip_shows_exact_time(self):
+        model = HostTableModel()
+        h = _make_host(id='1', name='H1', ip='192.168.1.1', status='OFFLINE', offline_since='2026-09-14T10:15:30+00:00')
+        model.set_hosts([h])
+
+        idx = model.index(0, 5)
+        tooltip = model.data(idx, Qt.ToolTipRole)
+        self.assertIsNotNone(tooltip)
+        self.assertIn("Недоступен с:", tooltip)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
 
