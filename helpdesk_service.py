@@ -150,7 +150,7 @@ class HelpdeskService:
                     
                     description = (
                         f"1. Лог. № банкомата: {host_name}\n"
-                        f"2. Статус: {status_action}\n"
+                        f"2. Статус: Установить/Снять: {status_action}\n"
                         f"3. Причина: {reason}"
                     )
                     try:
