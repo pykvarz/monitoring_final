@@ -117,11 +117,15 @@ class ContextMenuManager:
         elif action == action_notify:
             HostManager.toggle_notifications(self._parent, row, self._table_model, self._repository)
         elif action_hd_set is not None and action == action_hd_set:
-            HelpdeskService.process_offline([host.name], self._parent._config)
-            QMessageBox.information(self._parent, "Helpdesk", "Процесс создания тикета (Установка статуса) запущен в фоне.")
+            reasons = getattr(self._parent._config, 'helpdesk_reasons', ["без связи", "ошибка пинга", "техническое обслуживание"])
+            reason, ok = QInputDialog.getItem(self._parent, "Helpdesk", "Укажите причину заявки:", reasons, 0, True)
+            if ok and reason:
+                HelpdeskService.process_offline([host.name], self._parent._config, reason.strip())
         elif action_hd_remove is not None and action == action_hd_remove:
-            HelpdeskService.process_recovered([host.name], self._parent._config)
-            QMessageBox.information(self._parent, "Helpdesk", "Процесс создания тикета (Снятие статуса) запущен в фоне.")
+            reasons = getattr(self._parent._config, 'helpdesk_reasons', ["восстановление связи", "после ремонта"])
+            reason, ok = QInputDialog.getItem(self._parent, "Helpdesk", "Укажите причину (закрытие заявки):", reasons, 0, True)
+            if ok and reason:
+                HelpdeskService.process_recovered([host.name], self._parent._config, reason.strip())
 
     @staticmethod
     def _compute_cisco_ip(ip: str) -> str:

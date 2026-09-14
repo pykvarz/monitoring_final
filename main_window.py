@@ -117,7 +117,17 @@ class MainWindow(QMainWindow):
         # Подключение сигналов Repository
         self._repository.hosts_updated.connect(self._on_hosts_updated)
         
+        # Подключение сигналов Helpdesk
+        HelpdeskService.signals.ticket_created.connect(self._on_helpdesk_ticket_created)
+        HelpdeskService.signals.ticket_failed.connect(self._on_helpdesk_ticket_failed)
+        
         self._load_initial_data()
+
+    def _on_helpdesk_ticket_created(self, host: str, action: str) -> None:
+        NotificationService.show_notification("Helpdesk", f"Заявка ({action}) для {host} успешно создана.")
+
+    def _on_helpdesk_ticket_failed(self, host: str, action: str, error_msg: str) -> None:
+        NotificationService.show_notification("Ошибка Helpdesk", f"Не удалось создать заявку ({action}) для {host}:\n{error_msg}")
 
     # ==================== ИНИЦИАЛИЗАЦИЯ ====================
 

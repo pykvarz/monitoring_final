@@ -26,16 +26,6 @@
 - **Цвет выделения (Selection)**: `#2563eb`
 - **Чередование строк таблицы (Zebra Row)**: `#1e222e`
 
-#### Light Theme
-- **Фон окна (Background)**: `#f8f9fa`
-- **Фон карточек/панелей (Surface)**: `#ffffff`
-- **Фон элементов ввода/кнопок (Elevated Surface)**: `#ffffff`
-- **Границы (Borders)**: `#d0d7de`
-- **Текст основной (Primary Text)**: `#1e293b`
-- **Текст вторичный (Secondary Text)**: `#64748b`
-- **Цвет выделения (Selection)**: `#e3f2fd`
-- **Чередование строк таблицы (Zebra Row)**: `#f8f9fa`
-
 #### Tactical Theme (NOC Terminal)
 - **Фон окна (Background)**: `#090A0F`
 - **Фон карточек/панелей (Surface)**: `#0D1117`

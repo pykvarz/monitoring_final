@@ -174,6 +174,7 @@ class AppConfig:
     splitter_sizes: List[int] = field(default_factory=list)
     helpdesk_enabled: bool = False
     helpdesk_url: str = ""
+    helpdesk_reasons: List[str] = field(default_factory=lambda: ["без связи", "ошибка пинга", "техническое обслуживание"])
 
     def __post_init__(self):
         """Валидация конфигурации"""
