@@ -104,6 +104,8 @@ Windows 10/11. Поставка в виде автономного `.exe` (PyIns
 - [x] Сборка .exe (PyInstaller + build_exe.py)
 
 ### Последние обновления
+- **2026-09-14 — актуализация документации:**
+  - Полностью обновлены [README.md](file:///c:/Users/User/Desktop/Шаблон%20—%20копия/README.md) и [SECURITY.md](file:///c:/Users/User/Desktop/Шаблон%20—%20копия/SECURITY.md) под актуальную архитектуру, токены тем, HUD, Toast-уведомления и защитные механизмы (CWE-1236, защита от Command Injection, изоляция БД).
 - **2026-09-14 — устранение дефектов Medium и Low (MED-1..3, LOW-1..2):**
   - MED-1: В `models.py` добавлена поддержка IPv6 через `ipaddress.ip_address` и валидация однокомпонентных сетевых имен (`localhost`, `router`, `dc01`).
   - MED-2: В `theme_manager.py` удален мертвый код (`_update_toolbar_buttons`, `_update_filter_buttons`) с необъявленной функцией `get_svg_theme`.
