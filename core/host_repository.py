@@ -96,14 +96,6 @@ class HostRepository(QObject):
 
     # ==================== HISTORY ====================
 
-    def get_host_history(self, host_id: str, limit: int = 200) -> List[Dict]:
-        """История смены статусов конкретного узла"""
-        return self._data_manager.get_host_history(host_id, limit)
-
-    def clear_host_history(self, host_id: str) -> bool:
-        """Очистка истории конкретного узла"""
-        return self._data_manager.clear_host_history(host_id)
-
     def get_history_events(self, limit: int = 500, host_name_filter: str = None,
                             group_filter: str = None, status_filter: str = None) -> List[Dict]:
         """Общий журнал событий по всем узлам, с опциональными фильтрами"""

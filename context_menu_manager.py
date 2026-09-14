@@ -16,7 +16,7 @@ from host_manager import HostManager
 from ui_components import UIComponents
 from constants import (
     get_menu_style, SVG_MAINTENANCE, SVG_ONLINE, SVG_OFFLINE, SVG_WAITING,
-    get_svg_add_group, get_svg_delete, get_svg_ping, get_svg_edit, get_svg_history
+    get_svg_add_group, get_svg_delete, get_svg_ping, get_svg_edit
 )
 from core.host_repository import HostRepository
 from helpdesk_service import HelpdeskService
@@ -76,7 +76,6 @@ class ContextMenuManager:
             )
 
         action_edit = menu.addAction(UIComponents._get_qicon(get_svg_edit(theme)), "Редактировать")
-        action_history = menu.addAction(UIComponents._get_qicon(get_svg_history(theme)), "📋 История узла")
         action_delete = menu.addAction(UIComponents._get_qicon(get_svg_delete(theme)), "Удалить")
         menu.addSeparator()
         
@@ -108,8 +107,6 @@ class ContextMenuManager:
             self._ping_cmd(cisco_ip, label="Cisco")
         elif action == action_edit:
             HostManager.edit_host(self._parent, row, self._table_model, self._groups, self._repository)
-        elif action == action_history:
-            self._show_host_history(row)
         elif action == action_delete:
             HostManager.delete_host(self._parent, row, self._table_model, self._repository)
         elif action == action_maint:
@@ -220,22 +217,3 @@ class ContextMenuManager:
         except Exception as e:
             QMessageBox.warning(self._parent, "Ошибка", f"Не удалось открыть терминал: {e}")
 
-    def _show_host_history(self, row: int):
-        """Открыть диалог истории для конкретного узла"""
-        host = self._table_model.get_host(row)
-        if not host:
-            return
-
-        from history_views import HostHistoryDialog
-        dlg = HostHistoryDialog(self._parent, host, self._repository, theme=self._get_theme())
-
-        if not hasattr(self._parent, "_host_history_dialogs"):
-            self._parent._host_history_dialogs = []
-        self._parent._host_history_dialogs = [
-            d for d in self._parent._host_history_dialogs if d.isVisible()
-        ]
-        self._parent._host_history_dialogs.append(dlg)
-
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()

@@ -299,54 +299,6 @@ class DataManager(QObject):
             logging.warning(f"Не удалось записать событие истории для {host_id}: {query.lastError().text()}")
         query.finish()
 
-    def get_host_history(self, host_id: str, limit: int = 200) -> List[Dict]:
-        """История смены статусов конкретного узла (для правой панели)"""
-        events = []
-        db = self.db_manager.get_db()
-        if not db.isOpen():
-            return events
-
-        query = QSqlQuery(db)
-        query.prepare("""
-            SELECT old_status, new_status, timestamp FROM status_history
-            WHERE host_id = :host_id
-            ORDER BY timestamp DESC
-            LIMIT :limit
-        """)
-        query.bindValue(":host_id", host_id)
-        query.bindValue(":limit", limit)
-        if query.exec_():
-            while query.next():
-                events.append({
-                    "old_status": query.value("old_status"),
-                    "new_status": query.value("new_status"),
-                    "timestamp": query.value("timestamp"),
-                })
-        else:
-            logging.error(f"Ошибка чтения истории узла {host_id}: {query.lastError().text()}")
-        query.finish()
-        return events
-
-    def clear_host_history(self, host_id: str) -> bool:
-        """Очистка истории для конкретного узла"""
-        db = self.db_manager.get_db()
-        if not db.isOpen():
-            return False
-
-        query = QSqlQuery(db)
-        query.prepare("DELETE FROM status_history WHERE host_id = :host_id")
-        query.bindValue(":host_id", host_id)
-        success = query.exec_()
-        if success:
-            query.finish()
-            logging.info(f"История для узла {host_id} очищена")
-            return True
-        else:
-            err = query.lastError().text()
-            query.finish()
-            logging.error(f"Ошибка очистки истории узла {host_id}: {err}")
-            return False
-
     def get_history_events(self, limit: int = 500, host_name_filter: str = None,
                             group_filter: str = None, status_filter: str = None) -> List[Dict]:
         """

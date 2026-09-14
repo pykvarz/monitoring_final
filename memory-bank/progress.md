@@ -82,6 +82,9 @@
 - Стилизованы всплывающие окна главного меню и контекстных меню (QMenu) с тёмным фоном, контрастным текстом и иконками.
 - Настроены выпадающие списки (QComboBox QAbstractItemView), устранены дефекты «белый текст на белом фоне».
 - Интегрирован тёмный системный заголовок Windows 10/11 через DWMWA_USE_IMMERSIVE_DARK_MODE.
-- Все диалоговые окна (HostDialog, SettingsDialog, HistoryDialog, HostHistoryDialog) и поля ввода переведены на тёмные токены.
+- Все диалоговые окна (HostDialog, SettingsDialog, HistoryDialog) и поля ввода переведены на тёмные токены.
 - Установлена тёмная системная палитра QApplication для предотвращения появления светлых нативных виджетов.
+
+2026-09-14 — рефакторинг журнала событий:
+- Удален пункт контекстного меню «История узла», диалог HostHistoryDialog и связанные методы (get_host_history, clear_host_history, export_host_history). Общий журнал событий HistoryDialog (Ctrl+H) и панель EventLogPanel сохранены.
 

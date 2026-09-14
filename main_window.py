@@ -33,7 +33,7 @@ from dialogs import SettingsDialog
 from ui_components import UIComponents
 from host_manager import HostManager
 from table_model import CenteredIconDelegate
-from history_views import HostHistoryDialog, HistoryDialog, EventLogPanel
+from history_views import HistoryDialog, EventLogPanel
 
 # Менеджеры
 from filter_manager import FilterManager
