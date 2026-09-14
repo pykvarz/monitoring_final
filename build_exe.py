@@ -27,6 +27,8 @@ def build_exe():
         "--hidden-import=PyQt5.QtSvg",
         "--hidden-import=openpyxl",
         "--hidden-import=sqlite3",
+        "--hidden-import=playwright",
+        "--hidden-import=ping3",
         # Bundle data files if needed (e.g., config.json if it's static, but usually it's created at runtime)
         # "--add-data=config.json;." 
         main_script
