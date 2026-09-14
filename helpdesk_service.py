@@ -99,20 +99,39 @@ class HelpdeskService:
                             label_el = page.locator(f"xpath=//label[contains(text(), '{label}')]")
                             if await label_el.count() > 0:
                                 parent = label_el.locator("..")
-                                input_el = parent.locator("input, select, .select2-selection, .combo-box").first
+
+                                # 1. Проверяем стандартный HTML <select>
+                                select_el = parent.locator("select")
+                                if await select_el.count() > 0 and await select_el.first.is_visible():
+                                    try:
+                                        await select_el.first.select_option(label=text_to_select, timeout=3000)
+                                        await page.wait_for_timeout(400)
+                                        return
+                                    except Exception:
+                                        pass
+
+                                # 2. Для кастомных выпадающих списков (Select2, комбобоксы)
+                                input_el = parent.locator("input, select, .select2-selection, .combo-box, [role='combobox']").first
                                 await input_el.click(timeout=3000)
+                                await page.wait_for_timeout(300)
                                 option = page.get_by_text(text_to_select, exact=True).last
                                 await option.click(timeout=3000)
+                                await page.wait_for_timeout(400)
                         except Exception as ex:
                             logging.warning(f"Не удалось заполнить '{label}': {ex}")
 
-                    # Заполняем выпадающие списки
-                    await select_dropdown("Тип заявки", "Запрос на обслуживание")
+                    # Заполняем каскадные выпадающие списки:
+                    # - "Тип заявки" не трогаем (автоматически заполнен при открытии ссылки)
                     await select_dropdown("Соглашение/Услуга", "Устройство самообслуживания")
                     await select_dropdown("Категория услуги", "ATM")
                     await select_dropdown("Подкатегория", "Статус 13")
-                    await select_dropdown("Шаблон", "Статус 13")
-                    await select_dropdown("Режим работы", "Офис")
+
+                    # - "Шаблон" и "Режим работы" автоматически заполняются веб-формой при выборе "Подкатегория".
+                    # Даем странице время отработать встроенные AJAX-скрипты автозаполнения:
+                    try:
+                        await page.wait_for_load_state('networkidle', timeout=3000)
+                    except Exception:
+                        await page.wait_for_timeout(1000)
                     
                     # Текстовые поля
                     try:
