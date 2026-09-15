@@ -65,7 +65,7 @@ Windows 10/11. Поставка в виде автономного `.exe` (PyIns
 | Пинг | ping3 / ping.exe | ICMP (raw sockets с фоллбэком на системный ping) |
 | Уведомления | PyQt5 Desktop Toast + QSystemTrayIcon | Нативные окна без активации фокуса |
 | Экспорт/Импорт | openpyxl | 3.1.5 |
-| Helpdesk | playwright | 1.62.0 (опционально) |
+| Helpdesk | playwright | 1.62.0 (системный Edge/Chrome, опционально) |
 | Сборка | PyInstaller | NetworkMonitor.spec / build_exe.py |
 | Тесты | pytest | 195 тестов |
 
@@ -104,6 +104,8 @@ Windows 10/11. Поставка в виде автономного `.exe` (PyIns
 - [x] Сборка .exe (PyInstaller + build_exe.py)
 
 ### Последние обновления
+- **2026-09-15 — оптимизация Helpdesk-интеграции (Playwright):**
+  - В `helpdesk_service.py` реализован запуск через системный Microsoft Edge с маскировкой автоматизации (`--disable-blink-features=AutomationControlled`) и каскадным фоллбэком на Chrome / Chromium без необходимости отдельного скачивания `playwright install`.
 - **2026-09-14 — актуализация документации:**
   - Полностью обновлены [README.md](file:///c:/Users/User/Desktop/Шаблон%20—%20копия/README.md) и [SECURITY.md](file:///c:/Users/User/Desktop/Шаблон%20—%20копия/SECURITY.md) под актуальную архитектуру, токены тем, HUD, Toast-уведомления и защитные механизмы (CWE-1236, защита от Command Injection, изоляция БД).
 - **2026-09-14 — устранение дефектов Medium и Low (MED-1..3, LOW-1..2):**
