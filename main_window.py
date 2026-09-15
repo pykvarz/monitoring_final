@@ -29,7 +29,7 @@ from data_manager import DataManager
 from core.host_repository import HostRepository
 
 # UI компоненты
-from dialogs import SettingsDialog
+from dialogs import SettingsDialog, GroupManagerDialog
 from ui_components import UIComponents
 from host_manager import HostManager
 from table_model import CenteredIconDelegate
@@ -235,9 +235,9 @@ class MainWindow(QMainWindow):
 
         self._btn_add_group = QPushButton()
         self._btn_add_group.setIcon(UIComponents._get_qicon(get_svg_add_group(theme)))
-        self._btn_add_group.setToolTip("Добавить группу (Ctrl+G)")
+        self._btn_add_group.setToolTip("Управление группами (Ctrl+G)")
         self._btn_add_group.setStyleSheet(btn_style)
-        self._btn_add_group.clicked.connect(self._add_group)
+        self._btn_add_group.clicked.connect(self._manage_groups)
         action_bar_layout.addWidget(self._btn_add_group)
 
         self._btn_delete = QPushButton()
@@ -281,6 +281,9 @@ class MainWindow(QMainWindow):
 
         self._pause_shortcut = QShortcut(QKeySequence("Ctrl+Space"), self)
         self._pause_shortcut.activated.connect(self._toggle_pause)
+
+        self._group_shortcut = QShortcut(QKeySequence("Ctrl+G"), self)
+        self._group_shortcut.activated.connect(self._manage_groups)
 
         _make_sep()
 
@@ -611,25 +614,19 @@ class MainWindow(QMainWindow):
         HostManager.add_host(self, self._groups, self._repository)
 
     def _add_group(self) -> None:
-        dialog = QInputDialog(self)
-        dialog.setWindowTitle("Новая группа")
-        dialog.setLabelText("Введите название группы:")
-        from constants import get_main_style
-        dialog.setStyleSheet(get_main_style(self._config.theme))
-        from theme_manager import set_dark_titlebar
-        set_dark_titlebar(dialog, self._config.theme in ("dark", "tactical"))
-        ok = dialog.exec_() == QDialog.Accepted
-        group_name = dialog.textValue()
-        
-        if ok and group_name.strip():
-            group_name = group_name.strip()
-            if group_name not in self._groups:
-                self._config.custom_groups.append(group_name)
-                self._storage.save_config(self._config)
-                self._refresh_table() # Обновит группы
-                QMessageBox.information(self, "Успех", f"Группа '{group_name}' создана")
-            else:
-                QMessageBox.warning(self, "Ошибка", "Группа с таким названием уже существует")
+        """Открыть диалог управления группами"""
+        self._manage_groups()
+
+    def _manage_groups(self) -> None:
+        """Диалог управления группами (добавление, переименование, удаление)"""
+        dialog = GroupManagerDialog(
+            parent=self,
+            repository=self._repository,
+            config=self._config,
+            storage=self._storage
+        )
+        dialog.exec_()
+        self._refresh_table(full_reload=True)
 
     def _delete_selected(self) -> None:
         HostManager.delete_selected(self, self._table_model, self._repository)
@@ -722,7 +719,7 @@ class MainWindow(QMainWindow):
         self._storage.save_config(self._config)
 
     def _open_settings(self):
-        dialog = SettingsDialog(self, self._config)
+        dialog = SettingsDialog(self, self._config, repository=self._repository, storage=self._storage)
         if dialog.exec_() == QDialog.Accepted:
             new_config = dialog.get_config()
 
@@ -746,11 +743,13 @@ class MainWindow(QMainWindow):
             self._config.helpdesk_reasons = list(new_config.helpdesk_reasons)
             self._config.helpdesk_reasons_recovered = list(new_config.helpdesk_reasons_recovered)
             self._config.theme = new_config.theme
+            self._config.custom_groups = list(new_config.custom_groups)
 
             if self._storage.save_config(self._config):
                 self._monitor_thread.update_config(self._config)
                 self._repository.purge_old_history(self._config.history_retention_days)
                 self._theme_manager._apply_theme(self._config.theme)
+                self._refresh_table(full_reload=True)
                 self.statusBar().showMessage("Настройки сохранены", 3000)
 
     def _force_scan(self):

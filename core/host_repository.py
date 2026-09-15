@@ -111,3 +111,17 @@ class HostRepository(QObject):
     def clear_history(self) -> bool:
         """Полная очистка журнала событий"""
         return self._data_manager.clear_history()
+
+    # ==================== GROUPS ====================
+
+    def get_groups_with_counts(self) -> List[Tuple[str, int]]:
+        """Получение списка всех групп в БД с количеством узлов в них"""
+        return self._data_manager.get_groups_with_counts()
+
+    def rename_group(self, old_name: str, new_name: str) -> int:
+        """Переименование группы узлов в БД"""
+        return self._data_manager.rename_group(old_name, new_name)
+
+    def delete_group(self, group_name: str, fallback_group: str = "Без группы") -> int:
+        """Удаление группы узлов из БД с перемещением узлов в fallback_group"""
+        return self._data_manager.delete_group(group_name, fallback_group)

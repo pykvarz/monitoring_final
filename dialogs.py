@@ -4,17 +4,22 @@
 Диалоговые окна
 """
 
+from typing import Optional
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
     QCheckBox, QDialogButtonBox, QMessageBox, QGroupBox,
-    QSpinBox, QVBoxLayout as QVBox, QLabel
+    QSpinBox, QVBoxLayout as QVBox, QLabel, QListWidget, QListWidgetItem,
+    QHBoxLayout, QPushButton, QInputDialog
 )
 from PyQt5.QtGui import QIcon, QPixmap, QPainter
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtCore import Qt, QByteArray
 
 from models import Host, AppConfig, validate_ip_or_hostname
-from constants import get_svg_add_host, get_svg_settings, get_main_style, get_combobox_style
+from constants import (
+    get_svg_add_host, get_svg_settings, get_main_style, get_combobox_style,
+    get_svg_add_group, get_svg_edit, get_svg_delete
+)
 from theme_manager import set_dark_titlebar
 from ui_components import UIComponents
 
@@ -154,9 +159,11 @@ class HostDialog(QDialog):
 class SettingsDialog(QDialog):
     """Диалог настроек приложения"""
 
-    def __init__(self, parent=None, config: AppConfig = None):
+    def __init__(self, parent=None, config: AppConfig = None, repository=None, storage=None):
         super().__init__(parent)
         self._config = config or AppConfig()
+        self._repository = repository
+        self._storage = storage
         self._theme = getattr(self._config, 'theme', 'dark')
         self._set_window_icon()
         self._init_ui()
@@ -311,6 +318,19 @@ class SettingsDialog(QDialog):
         appearance_layout.addRow("Тема оформления:", self._theme_combo)
         appearance_group.setLayout(appearance_layout)
 
+        # Группа: Группы узлов
+        groups_box = QGroupBox("Группы узлов")
+        groups_box.setStyleSheet("QGroupBox { font-weight: bold; }")
+        groups_layout = QHBoxLayout()
+        manage_groups_btn = QPushButton("Управление группами...")
+        manage_groups_btn.setIcon(UIComponents._get_qicon(get_svg_edit(self._theme)))
+        manage_groups_btn.clicked.connect(self._open_group_manager)
+        if self._repository is None:
+            manage_groups_btn.setEnabled(False)
+        groups_layout.addWidget(manage_groups_btn)
+        groups_layout.addStretch()
+        groups_box.setLayout(groups_layout)
+
         # Кнопки
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -322,10 +342,17 @@ class SettingsDialog(QDialog):
         layout.addWidget(history_group)
         layout.addWidget(helpdesk_group)
         layout.addWidget(appearance_group)
+        layout.addWidget(groups_box)
         layout.addStretch()
         layout.addWidget(buttons)
 
         self.setLayout(layout)
+
+    def _open_group_manager(self):
+        """Открытие диалога управления группами"""
+        if self._repository is not None:
+            dlg = GroupManagerDialog(self, repository=self._repository, config=self._config, storage=self._storage)
+            dlg.exec_()
 
     def get_config(self) -> AppConfig:
         """Получение конфигурации.
@@ -358,3 +385,207 @@ class SettingsDialog(QDialog):
             event_log_on_top=self._config.event_log_on_top,
             event_log_geometry=list(self._config.event_log_geometry),
         )
+
+
+class GroupManagerDialog(QDialog):
+    """Диалог управления группами узлов (добавление, переименование, удаление)"""
+
+    def __init__(self, parent=None, repository=None, config: AppConfig = None, storage=None):
+        super().__init__(parent)
+        self._repository = repository
+        self._config = config or AppConfig()
+        self._storage = storage
+        self._theme = getattr(self._config, 'theme', 'dark')
+        self._init_ui()
+        self._refresh_list()
+
+    def _init_ui(self):
+        self.setWindowTitle("Управление группами")
+        self.setModal(True)
+        self.setMinimumSize(420, 360)
+        self.setStyleSheet(get_main_style(self._theme))
+        set_dark_titlebar(self, self._theme in ("dark", "tactical"))
+
+        layout = QVBoxLayout(self)
+
+        header_lbl = QLabel("Список групп и количество узлов:")
+        header_lbl.setStyleSheet("font-weight: bold; margin-bottom: 4px;")
+        layout.addWidget(header_lbl)
+
+        content_layout = QHBoxLayout()
+
+        self._list_widget = QListWidget()
+        self._list_widget.itemSelectionChanged.connect(self._on_selection_changed)
+        content_layout.addWidget(self._list_widget)
+
+        btn_layout = QVBoxLayout()
+        btn_layout.setSpacing(8)
+
+        self._btn_add = QPushButton("Добавить...")
+        self._btn_add.setIcon(UIComponents._get_qicon(get_svg_add_group(self._theme)))
+        self._btn_add.clicked.connect(self._on_add_group)
+
+        self._btn_edit = QPushButton("Переименовать...")
+        self._btn_edit.setIcon(UIComponents._get_qicon(get_svg_edit(self._theme)))
+        self._btn_edit.clicked.connect(self._on_edit_group)
+        self._btn_edit.setEnabled(False)
+
+        self._btn_delete = QPushButton("Удалить")
+        self._btn_delete.setIcon(UIComponents._get_qicon(get_svg_delete(self._theme)))
+        self._btn_delete.clicked.connect(self._on_delete_group)
+        self._btn_delete.setEnabled(False)
+
+        btn_layout.addWidget(self._btn_add)
+        btn_layout.addWidget(self._btn_edit)
+        btn_layout.addWidget(self._btn_delete)
+        btn_layout.addStretch()
+
+        content_layout.addLayout(btn_layout)
+        layout.addLayout(content_layout)
+
+        # Нижняя кнопка закрытия
+        btn_box = QDialogButtonBox(QDialogButtonBox.Close)
+        btn_box.rejected.connect(self.accept)
+        layout.addWidget(btn_box)
+
+    def _refresh_list(self):
+        current_sel = self._get_selected_group()
+        self._list_widget.clear()
+
+        counts_map = {}
+        if self._repository:
+            counts_map = dict(self._repository.get_groups_with_counts())
+
+        # Множество всех групп: группы из конфига и из БД
+        all_groups = set(self._config.custom_groups)
+        all_groups.update(counts_map.keys())
+        all_groups.discard("Без группы")
+        sorted_groups = ["Без группы"] + sorted(all_groups, key=lambda s: s.lower())
+
+        for grp in sorted_groups:
+            cnt = counts_map.get(grp, 0)
+            item = QListWidgetItem(f"{grp} ({cnt})")
+            item.setData(Qt.UserRole, grp)
+            self._list_widget.addItem(item)
+            if current_sel and grp == current_sel:
+                self._list_widget.setCurrentItem(item)
+
+        self._on_selection_changed()
+
+    def _get_selected_group(self) -> Optional[str]:
+        item = self._list_widget.currentItem()
+        if not item:
+            return None
+        data = item.data(Qt.UserRole)
+        if data:
+            return data
+        txt = item.text()
+        return txt.rsplit(" (", 1)[0] if " (" in txt else txt
+
+    def _select_group(self, group_name: str):
+        for i in range(self._list_widget.count()):
+            item = self._list_widget.item(i)
+            grp = item.data(Qt.UserRole) or (item.text().rsplit(" (", 1)[0] if " (" in item.text() else item.text())
+            if grp == group_name:
+                self._list_widget.setCurrentItem(item)
+                break
+
+    def _on_selection_changed(self):
+        selected = self._get_selected_group()
+        can_modify = bool(selected and selected != "Без группы")
+        self._btn_edit.setEnabled(can_modify)
+        self._btn_delete.setEnabled(can_modify)
+
+    def _on_add_group(self):
+        name, ok = QInputDialog.getText(self, "Добавить группу", "Название новой группы:")
+        if not ok:
+            return
+        name = name.strip()
+        if not name:
+            return
+        if name in self._config.custom_groups or name == "Без группы":
+            QMessageBox.warning(self, "Внимание", f"Группа '{name}' уже существует.")
+            return
+
+        self._config.custom_groups.append(name)
+        if self._storage:
+            self._storage.save_config(self._config)
+        self._refresh_list()
+        self._select_group(name)
+
+    def _on_edit_group(self):
+        selected = self._get_selected_group()
+        if not selected:
+            return
+        if selected == "Без группы":
+            QMessageBox.warning(self, "Внимание", "Нельзя переименовать системную группу 'Без группы'.")
+            return
+
+        new_name, ok = QInputDialog.getText(self, "Переименовать группу", "Новое название группы:", text=selected)
+        if not ok:
+            return
+        new_name = new_name.strip()
+        if not new_name or new_name == selected:
+            return
+        if new_name in self._config.custom_groups or new_name == "Без группы":
+            QMessageBox.warning(self, "Внимание", f"Группа '{new_name}' уже существует.")
+            return
+
+        # Обновляем узлы в БД
+        if self._repository:
+            self._repository.rename_group(selected, new_name)
+
+        # Обновляем в конфиге
+        if selected in self._config.custom_groups:
+            idx = self._config.custom_groups.index(selected)
+            self._config.custom_groups[idx] = new_name
+        else:
+            self._config.custom_groups.append(new_name)
+
+        if self._storage:
+            self._storage.save_config(self._config)
+
+        self._refresh_list()
+        self._select_group(new_name)
+
+    def _on_delete_group(self):
+        selected = self._get_selected_group()
+        if not selected:
+            return
+        if selected == "Без группы":
+            QMessageBox.warning(self, "Внимание", "Нельзя удалить системную группу 'Без группы'.")
+            return
+
+        count = 0
+        if self._repository:
+            counts = dict(self._repository.get_groups_with_counts())
+            count = counts.get(selected, 0)
+
+        msg = (
+            f"Вы уверены, что хотите удалить группу '{selected}'?\n"
+            f"Все узлы ({count}) будут перемещены в группу 'Без группы'."
+            if count > 0 else
+            f"Удалить группу '{selected}'?"
+        )
+        reply = QMessageBox.question(
+            self,
+            "Удаление группы",
+            msg,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        # Удаляем узлы из группы в БД и переносим в 'Без группы'
+        if self._repository:
+            self._repository.delete_group(selected, fallback_group="Без группы")
+
+        # Удаляем из конфига
+        if selected in self._config.custom_groups:
+            self._config.custom_groups.remove(selected)
+
+        if self._storage:
+            self._storage.save_config(self._config)
+
+        self._refresh_list()

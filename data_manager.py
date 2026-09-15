@@ -530,4 +530,72 @@ class DataManager(QObject):
             
         return stats
 
+    def get_groups_with_counts(self) -> List[Tuple[str, int]]:
+        """Получение списка всех групп в БД с количеством узлов в них"""
+        db = self.db_manager.get_db()
+        if not db.isOpen():
+            return []
+            
+        results = []
+        query = QSqlQuery("SELECT grp, COUNT(*) FROM hosts GROUP BY grp ORDER BY grp", db)
+        while query.next():
+            grp = query.value(0) or "Без группы"
+            cnt = query.value(1) or 0
+            results.append((grp, int(cnt)))
+        query.finish()
+        return results
+
+    def rename_group(self, old_name: str, new_name: str) -> int:
+        """
+        Переименование группы узлов в БД.
+        Возвращает количество обновленных узлов.
+        """
+        db = self.db_manager.get_db()
+        if not db.isOpen() or not old_name or not new_name:
+            return 0
+
+        query = QSqlQuery(db)
+        query.prepare("UPDATE hosts SET grp = :new_name WHERE grp = :old_name")
+        query.bindValue(":new_name", new_name)
+        query.bindValue(":old_name", old_name)
+
+        if query.exec_():
+            updated = query.numRowsAffected()
+            query.finish()
+            if updated > 0:
+                logging.info(f"Группа '{old_name}' переименована в '{new_name}' (обновлено {updated} узлов)")
+                self._trigger_update()
+            return updated
+        else:
+            err = query.lastError().text()
+            query.finish()
+            logging.error(f"Ошибка переименования группы '{old_name}' -> '{new_name}': {err}")
+            return 0
+
+    def delete_group(self, group_name: str, fallback_group: str = "Без группы") -> int:
+        """
+        Удаление группы узлов из БД: все узлы переносятся в fallback_group.
+        Возвращает количество перемещенных узлов.
+        """
+        db = self.db_manager.get_db()
+        if not db.isOpen() or not group_name:
+            return 0
+
+        query = QSqlQuery(db)
+        query.prepare("UPDATE hosts SET grp = :fallback_group WHERE grp = :group_name")
+        query.bindValue(":fallback_group", fallback_group)
+        query.bindValue(":group_name", group_name)
+
+        if query.exec_():
+            moved = query.numRowsAffected()
+            query.finish()
+            logging.info(f"Группа '{group_name}' удалена (перемещено {moved} узлов в '{fallback_group}')")
+            self._trigger_update()
+            return moved
+        else:
+            err = query.lastError().text()
+            query.finish()
+            logging.error(f"Ошибка при удалении группы '{group_name}': {err}")
+            return 0
+
 
