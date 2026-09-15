@@ -95,10 +95,25 @@ class HelpdeskService:
                 if ":" in domain:
                     domain = domain.split(":")[0]
                 
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=[f'--auth-server-allowlist="{domain}"']
-                )
+                # Запуск браузера: системный Microsoft Edge (по умолчанию на Windows), затем Chrome / встроенный Chromium
+                launch_args = [
+                    f'--auth-server-allowlist="{domain}"',
+                    '--disable-blink-features=AutomationControlled',
+                ]
+                browser = None
+                for channel in ["msedge", "chrome", None]:
+                    try:
+                        kwargs = {"headless": True, "args": launch_args}
+                        if channel:
+                            kwargs["channel"] = channel
+                        browser = await p.chromium.launch(**kwargs)
+                        break
+                    except Exception:
+                        continue
+
+                if not browser:
+                    raise RuntimeError("Не удалось запустить браузер (Microsoft Edge или Chrome не найдены в системе)")
+
                 context = await browser.new_context()
                 page = await context.new_page()
                 
