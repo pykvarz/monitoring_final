@@ -281,11 +281,17 @@ class SettingsDialog(QDialog):
         reasons_list = getattr(self._config, 'helpdesk_reasons', ["без связи", "ошибка пинга", "техническое обслуживание"])
         self._hd_reasons = QLineEdit(", ".join(reasons_list))
         self._hd_reasons.setPlaceholderText("без связи, ошибка пинга, тех. работы")
-        self._hd_reasons.setToolTip("Готовые варианты причин (через запятую)")
+        self._hd_reasons.setToolTip("Готовые варианты причин открытия заявки (через запятую)")
+
+        reasons_rec_list = getattr(self._config, 'helpdesk_reasons_recovered', ["восстановление связи", "после ремонта"])
+        self._hd_reasons_recovered = QLineEdit(", ".join(reasons_rec_list))
+        self._hd_reasons_recovered.setPlaceholderText("восстановление связи, после ремонта")
+        self._hd_reasons_recovered.setToolTip("Готовые варианты причин закрытия заявки (через запятую)")
         
         helpdesk_layout.addRow("", self._hd_enabled)
         helpdesk_layout.addRow("URL создания заявки:", self._hd_url)
-        helpdesk_layout.addRow("Готовые причины:", self._hd_reasons)
+        helpdesk_layout.addRow("Причины открытия:", self._hd_reasons)
+        helpdesk_layout.addRow("Причины закрытия:", self._hd_reasons_recovered)
         helpdesk_group.setLayout(helpdesk_layout)
 
         # Группа: Внешний вид
@@ -341,6 +347,7 @@ class SettingsDialog(QDialog):
             helpdesk_enabled=self._hd_enabled.isChecked(),
             helpdesk_url=self._hd_url.text().strip(),
             helpdesk_reasons=[r.strip() for r in self._hd_reasons.text().split(",") if r.strip()],
+            helpdesk_reasons_recovered=[r.strip() for r in self._hd_reasons_recovered.text().split(",") if r.strip()],
             column_widths=dict(self._config.column_widths),
             column_order=list(self._config.column_order),
             hidden_columns=list(self._config.hidden_columns),

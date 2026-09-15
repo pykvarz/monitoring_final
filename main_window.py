@@ -743,6 +743,8 @@ class MainWindow(QMainWindow):
             self._config.history_retention_days = new_config.history_retention_days
             self._config.helpdesk_enabled = new_config.helpdesk_enabled
             self._config.helpdesk_url = new_config.helpdesk_url
+            self._config.helpdesk_reasons = list(new_config.helpdesk_reasons)
+            self._config.helpdesk_reasons_recovered = list(new_config.helpdesk_reasons_recovered)
             self._config.theme = new_config.theme
 
             if self._storage.save_config(self._config):

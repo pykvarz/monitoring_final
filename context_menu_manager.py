@@ -137,18 +137,32 @@ class ContextMenuManager:
             if not self.is_atm_group(host.group):
                 QMessageBox.warning(self._parent, "Helpdesk", "Создание заявки доступно только для узлов группы АТМ.")
                 return
-            reasons = getattr(self._parent._config, 'helpdesk_reasons', ["без связи", "ошибка пинга", "техническое обслуживание"])
+            reasons = list(getattr(self._parent._config, 'helpdesk_reasons', ["без связи", "ошибка пинга", "техническое обслуживание"]))
             reason, ok = QInputDialog.getItem(self._parent, "Helpdesk", "Укажите причину заявки:", reasons, 0, True)
             if ok and reason:
-                HelpdeskService.process_offline([host.name], self._parent._config, reason.strip())
+                clean_reason = reason.strip()
+                if clean_reason:
+                    if clean_reason not in reasons:
+                        reasons.append(clean_reason)
+                        self._parent._config.helpdesk_reasons = reasons
+                        if hasattr(self._parent, '_storage') and self._parent._storage:
+                            self._parent._storage.save_config(self._parent._config)
+                    HelpdeskService.process_offline([host.name], self._parent._config, clean_reason)
         elif action_hd_remove is not None and action == action_hd_remove:
             if not self.is_atm_group(host.group):
                 QMessageBox.warning(self._parent, "Helpdesk", "Закрытие заявки доступно только для узлов группы АТМ.")
                 return
-            reasons = getattr(self._parent._config, 'helpdesk_reasons', ["восстановление связи", "после ремонта"])
+            reasons = list(getattr(self._parent._config, 'helpdesk_reasons_recovered', ["восстановление связи", "после ремонта"]))
             reason, ok = QInputDialog.getItem(self._parent, "Helpdesk", "Укажите причину (закрытие заявки):", reasons, 0, True)
             if ok and reason:
-                HelpdeskService.process_recovered([host.name], self._parent._config, reason.strip())
+                clean_reason = reason.strip()
+                if clean_reason:
+                    if clean_reason not in reasons:
+                        reasons.append(clean_reason)
+                        self._parent._config.helpdesk_reasons_recovered = reasons
+                        if hasattr(self._parent, '_storage') and self._parent._storage:
+                            self._parent._storage.save_config(self._parent._config)
+                    HelpdeskService.process_recovered([host.name], self._parent._config, clean_reason)
 
     @staticmethod
     def is_atm_group(group: str) -> bool:

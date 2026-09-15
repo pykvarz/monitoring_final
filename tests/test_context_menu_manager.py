@@ -196,6 +196,46 @@ class TestContextMenuManager(unittest.TestCase):
             self.assertTrue(any("Helpdesk: открыть заявку" in label for label in labels))
             self.assertTrue(any("Helpdesk: закрыть заявку" in label for label in labels))
 
+    @patch("context_menu_manager.HelpdeskService.process_offline")
+    @patch("context_menu_manager.QInputDialog.getItem")
+    @patch("context_menu_manager.QMenu.exec_")
+    def test_new_helpdesk_reason_is_saved_to_config(self, mock_exec, mock_get_item, mock_process):
+        """Проверка, что новая введенная причина сохраняется в config.helpdesk_reasons и на диск."""
+        self.mock_parent._config = MagicMock()
+        self.mock_parent._config.helpdesk_enabled = True
+        self.mock_parent._config.helpdesk_reasons = ["без связи", "ошибка пинга"]
+        self.mock_parent._storage = MagicMock()
+
+        atm_host = Host(id="h1", ip="192.168.1.10", name="ATM_01", group="АТМ")
+
+        # Настраиваем QInputDialog на ввод новой причины
+        mock_get_item.return_value = ("новая причина от пользователя", True)
+
+        # Мокаем выбор пункта Helpdesk: открыть заявку в меню
+        def fake_exec(pos):
+            # Возвращаем action_hd_set, который был добавлен
+            return self.manager._last_action_hd_set
+
+        with patch("context_menu_manager.QMenu.addAction") as mock_add_action:
+            action_mock = MagicMock()
+            def side_effect(*args, **kwargs):
+                nonlocal action_mock
+                act = MagicMock()
+                if len(args) > 1 and "открыть заявку" in args[1]:
+                    self.manager._last_action_hd_set = act
+                return act
+            mock_add_action.side_effect = side_effect
+            mock_exec.side_effect = lambda pos: self.manager._last_action_hd_set
+
+            self.manager.show_menu_for_host(atm_host, QPoint(0, 0))
+
+        # Проверяем, что новая причина добавлена в список
+        self.assertIn("новая причина от пользователя", self.mock_parent._config.helpdesk_reasons)
+        # Проверяем, что сохранение конфигурации было вызвано
+        self.mock_parent._storage.save_config.assert_called_once_with(self.mock_parent._config)
+        # Проверяем, что сервис был вызван с новой причиной
+        mock_process.assert_called_once_with(["ATM_01"], self.mock_parent._config, "новая причина от пользователя")
+
 
 if __name__ == '__main__':
     unittest.main()

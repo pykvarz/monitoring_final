@@ -173,6 +173,7 @@ class AppConfig:
     helpdesk_enabled: bool = False
     helpdesk_url: str = ""
     helpdesk_reasons: List[str] = field(default_factory=lambda: ["без связи", "ошибка пинга", "техническое обслуживание"])
+    helpdesk_reasons_recovered: List[str] = field(default_factory=lambda: ["восстановление связи", "после ремонта"])
 
     def __post_init__(self):
         """Валидация конфигурации"""
