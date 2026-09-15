@@ -85,6 +85,21 @@ class HelpdeskService:
             cls._log_future_error(future, host, "Снять")
 
     @staticmethod
+    def format_atm_number(host_name: str) -> str:
+        """
+        Форматирует имя хоста/номер банкомата для Helpdesk:
+        добавляет префикс '0000', если значение уже не начинается с '0000'.
+        """
+        if not host_name:
+            return ""
+        name = str(host_name).strip()
+        if not name:
+            return ""
+        if name.startswith("0000"):
+            return name
+        return f"0000{name}"
+
+    @staticmethod
     async def _process_ticket_task_async(url: str, host_name: str, status_action: str, reason: str = "без связи"):
         try:
             from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
@@ -162,23 +177,26 @@ class HelpdeskService:
                     except Exception:
                         await page.wait_for_timeout(1000)
                     
+                    # Форматируем номер банкомата с добавлением префикса 0000
+                    formatted_name = HelpdeskService.format_atm_number(host_name)
+
                     # Текстовые поля
                     try:
                         loc_box = page.locator("xpath=//label[contains(text(), 'Местонахождение')]/..//input")
                         if await loc_box.count() > 0:
-                            await loc_box.first.fill(host_name)
+                            await loc_box.first.fill(formatted_name)
                     except Exception:
                         pass
 
                     try:
                         subj_box = page.locator("xpath=//label[contains(text(), 'Тема')]/..//input")
                         if await subj_box.count() > 0:
-                            await subj_box.first.fill(f"Лог. номер ATM: {host_name}")
+                            await subj_box.first.fill(f"Лог. номер ATM: {formatted_name}")
                     except Exception:
                         pass
                     
                     description = (
-                        f"1. Лог. № банкомата: {host_name}\n"
+                        f"1. Лог. № банкомата: {formatted_name}\n"
                         f"2. Статус: Установить/Снять: {status_action}\n"
                         f"3. Причина: {reason}"
                     )
