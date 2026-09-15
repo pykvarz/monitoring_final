@@ -4,6 +4,7 @@
 Менеджер контекстных меню
 """
 
+import re
 import sys
 import subprocess
 import ipaddress
@@ -109,10 +110,11 @@ class ContextMenuManager:
         else:
             action_notify = menu.addAction(UIComponents._get_qicon(get_svg_bell(theme)), "Включить уведомления")
             
-        # Helpdesk Integration
+        # Helpdesk Integration (доступно только для группы АТМ)
         action_hd_set = None
         action_hd_remove = None
-        if hasattr(self._parent, '_config') and self._parent._config.helpdesk_enabled:
+        is_atm = self.is_atm_group(host.group) if host else False
+        if hasattr(self._parent, '_config') and self._parent._config.helpdesk_enabled and is_atm:
             menu.addSeparator()
             action_hd_set = menu.addAction(UIComponents._get_qicon(get_svg_ticket(theme)), "Helpdesk: открыть заявку (Статус 13)")
             action_hd_remove = menu.addAction(UIComponents._get_qicon(get_svg_ticket_check(theme)), "Helpdesk: закрыть заявку")
@@ -132,15 +134,28 @@ class ContextMenuManager:
         elif action == action_notify:
             HostManager.toggle_notifications_item(self._parent, host, self._repository)
         elif action_hd_set is not None and action == action_hd_set:
+            if not self.is_atm_group(host.group):
+                QMessageBox.warning(self._parent, "Helpdesk", "Создание заявки доступно только для узлов группы АТМ.")
+                return
             reasons = getattr(self._parent._config, 'helpdesk_reasons', ["без связи", "ошибка пинга", "техническое обслуживание"])
             reason, ok = QInputDialog.getItem(self._parent, "Helpdesk", "Укажите причину заявки:", reasons, 0, True)
             if ok and reason:
                 HelpdeskService.process_offline([host.name], self._parent._config, reason.strip())
         elif action_hd_remove is not None and action == action_hd_remove:
+            if not self.is_atm_group(host.group):
+                QMessageBox.warning(self._parent, "Helpdesk", "Закрытие заявки доступно только для узлов группы АТМ.")
+                return
             reasons = getattr(self._parent._config, 'helpdesk_reasons', ["восстановление связи", "после ремонта"])
             reason, ok = QInputDialog.getItem(self._parent, "Helpdesk", "Укажите причину (закрытие заявки):", reasons, 0, True)
             if ok and reason:
                 HelpdeskService.process_recovered([host.name], self._parent._config, reason.strip())
+
+    @staticmethod
+    def is_atm_group(group: str) -> bool:
+        """Проверяет, относится ли группа узла к банкоматам / АТМ (регистронезависимо, кириллица/латиница)"""
+        if not group or not isinstance(group, str):
+            return False
+        return bool(re.search(r'(?i)(?:\b|_)(?:АТМ|ATM|банкомат\w*)(?:\b|_)', group.strip()))
 
     @staticmethod
     def _compute_cisco_ip(ip: str) -> str:

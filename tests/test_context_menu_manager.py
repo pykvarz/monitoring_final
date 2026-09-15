@@ -161,6 +161,41 @@ class TestContextMenuManager(unittest.TestCase):
         args = parent_widget._context_menu_manager.show_context_menu_for_host_id.call_args[0]
         self.assertEqual(args[0], "host_99")
 
+    def test_is_atm_group(self):
+        """Проверка корректности определения группы АТМ / Банкоматы"""
+        self.assertTrue(ContextMenuManager.is_atm_group("АТМ"))
+        self.assertTrue(ContextMenuManager.is_atm_group("ATM"))
+        self.assertTrue(ContextMenuManager.is_atm_group("атм"))
+        self.assertTrue(ContextMenuManager.is_atm_group("АТМ_1"))
+        self.assertTrue(ContextMenuManager.is_atm_group("Банкоматы"))
+        self.assertTrue(ContextMenuManager.is_atm_group("Банкомат 42"))
+        self.assertFalse(ContextMenuManager.is_atm_group("Серверы"))
+        self.assertFalse(ContextMenuManager.is_atm_group("Платформа"))
+        self.assertFalse(ContextMenuManager.is_atm_group("Без группы"))
+        self.assertFalse(ContextMenuManager.is_atm_group(""))
+        self.assertFalse(ContextMenuManager.is_atm_group(None))
+
+    @patch("context_menu_manager.QMenu.exec_")
+    def test_helpdesk_menu_only_for_atm_group(self, mock_exec):
+        """Проверка, что пункты меню Helpdesk добавляются только для узлов из группы АТМ"""
+        self.mock_parent._config = MagicMock()
+        self.mock_parent._config.helpdesk_enabled = True
+
+        # 1. Хост не из группы АТМ (например, Серверы)
+        server_host = Host(id="h1", ip="192.168.1.10", name="Server1", group="Серверы")
+        with patch("context_menu_manager.QMenu.addAction") as mock_add_action:
+            self.manager.show_menu_for_host(server_host, QPoint(0, 0))
+            labels = [call[0][1] for call in mock_add_action.call_args_list if len(call[0]) > 1]
+            self.assertFalse(any("Helpdesk" in label for label in labels))
+
+        # 2. Хост из группы АТМ
+        atm_host = Host(id="h2", ip="192.168.1.20", name="ATM001", group="АТМ")
+        with patch("context_menu_manager.QMenu.addAction") as mock_add_action:
+            self.manager.show_menu_for_host(atm_host, QPoint(0, 0))
+            labels = [call[0][1] for call in mock_add_action.call_args_list if len(call[0]) > 1]
+            self.assertTrue(any("Helpdesk: открыть заявку" in label for label in labels))
+            self.assertTrue(any("Helpdesk: закрыть заявку" in label for label in labels))
+
 
 if __name__ == '__main__':
     unittest.main()
