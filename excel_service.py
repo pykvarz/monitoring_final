@@ -95,11 +95,13 @@ class ExcelService:
     def sanitize_cell_value(val: any) -> any:
         """
         Предотвращает Formula Injection (CWE-1236) при экспорте в Excel.
-        Если строковое значение начинается с '=', '+', '-', '@', '\t', '\r',
-        экранирует его ведущим апострофом.
+        Если строковое значение (включая строки с начальными пробелами)
+        начинается с '=', '+', '-', '@', '\t', '\r', экранирует его ведущим апострофом.
         """
-        if isinstance(val, str) and val and val[0] in ('=', '+', '-', '@', '\t', '\r'):
-            return "'" + val
+        if isinstance(val, str) and val:
+            stripped = val.lstrip()
+            if stripped and stripped[0] in ('=', '+', '-', '@', '\t', '\r'):
+                return "'" + val
         return val
 
     @staticmethod

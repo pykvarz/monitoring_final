@@ -236,6 +236,27 @@ class TestExcelService(unittest.TestCase):
         self.assertEqual(addr_val, "'+123456789")
         self.assertEqual(group_val, "'-AdminGroup")
 
+    def test_sanitize_cell_value_whitespace_and_triggers(self):
+        """Test that sanitize_cell_value catches formula characters preceded by whitespace."""
+        test_cases = [
+            ("  =cmd|' /C calc'!A0", "'  =cmd|' /C calc'!A0"),
+            ("   +123456", "'   +123456"),
+            (" -TestGroup", "' -TestGroup"),
+            ("  @SUM(A1:B2)", "'  @SUM(A1:B2)"),
+            ("\t=1+1", "'\t=1+1"),
+            ("\r-cmd", "'\r-cmd"),
+            ("Normal Server", "Normal Server"),
+            ("   Normal With Spaces", "   Normal With Spaces"),
+            ("", ""),
+            ("   ", "   "),
+            (None, None),
+            (123, 123),
+            (45.67, 45.67),
+        ]
+        for val, expected in test_cases:
+            with self.subTest(val=val):
+                self.assertEqual(ExcelService.sanitize_cell_value(val), expected)
+
 
 if __name__ == '__main__':
     unittest.main()

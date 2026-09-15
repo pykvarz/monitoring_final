@@ -15,6 +15,10 @@ debug.log
 hosts.json
 config.json
 
+# Environment variables
+.env
+.env*.local
+
 # IDE
 .idea/
 .vscode/

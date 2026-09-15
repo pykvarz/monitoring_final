@@ -7,8 +7,9 @@
 import json
 import dataclasses
 import logging
+import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Union
 from contextlib import contextmanager
 
 from PyQt5.QtCore import QMutex
@@ -21,10 +22,32 @@ from database import DatabaseManager  # NEW
 class StorageManager(IStorageRepository):
     """Потокобезопасное хранилище данных (JSON реализация)"""
 
-    def __init__(self):
+    def __init__(self, base_dir: Optional[Union[str, Path]] = None):
         self._mutex = QMutex()
-        self._hosts_file = Path("hosts.json")
-        self._config_file = Path("config.json")
+        if base_dir is not None:
+            self._base_dir = Path(base_dir)
+        elif getattr(sys, 'frozen', False):
+            self._base_dir = Path(sys.executable).resolve().parent
+        else:
+            self._base_dir = Path(".")
+
+        self._hosts_file = self._base_dir / "hosts.json"
+        self._config_file = self._base_dir / "config.json"
+
+    @property
+    def base_dir(self) -> Path:
+        """Базовая директория хранения данных"""
+        return self._base_dir
+
+    @property
+    def hosts_file(self) -> Path:
+        """Путь к файлу hosts.json"""
+        return self._hosts_file
+
+    @property
+    def config_file(self) -> Path:
+        """Путь к файлу config.json"""
+        return self._config_file
 
     @contextmanager
     def _lock(self):

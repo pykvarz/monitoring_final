@@ -10,6 +10,11 @@ import sys
 import logging
 from logging.handlers import RotatingFileHandler
 import traceback
+from pathlib import Path
+
+# Базовая директория приложения (устойчива к запуску из ярлыка с произвольным CWD)
+app_dir = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
+log_file = app_dir / 'debug.log'
 
 # Настройка логирования: INFO по умолчанию, DEBUG при запуске с флагом --debug
 log_level = logging.DEBUG if "--debug" in sys.argv else logging.INFO
@@ -18,7 +23,7 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        RotatingFileHandler('debug.log', maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8')
+        RotatingFileHandler(str(log_file), maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8')
     ]
 )
 

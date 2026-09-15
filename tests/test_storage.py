@@ -214,6 +214,32 @@ class TestStorageManager(unittest.TestCase):
         # Cleanup
         TestFixtures.cleanup_db(db_manager)
 
+    def test_storage_custom_base_dir(self):
+        """Test that StorageManager works correctly with a custom base_dir."""
+        sub_dir = Path(self.temp_dir) / "custom_storage"
+        sub_dir.mkdir(parents=True, exist_ok=True)
+
+        storage = StorageManager(base_dir=sub_dir)
+        self.assertEqual(storage.base_dir, sub_dir)
+        self.assertEqual(storage.hosts_file, sub_dir / "hosts.json")
+        self.assertEqual(storage.config_file, sub_dir / "config.json")
+
+        # Verify saving hosts and config writes to sub_dir
+        hosts = TestFixtures.create_sample_hosts(2)
+        self.assertTrue(storage.save_hosts(hosts))
+        self.assertTrue((sub_dir / "hosts.json").exists())
+
+        loaded_hosts = storage.load_hosts()
+        self.assertEqual(len(loaded_hosts), 2)
+
+        config = AppConfig(theme="tactical", poll_interval=7)
+        self.assertTrue(storage.save_config(config))
+        self.assertTrue((sub_dir / "config.json").exists())
+
+        loaded_config = storage.load_config()
+        self.assertEqual(loaded_config.theme, "tactical")
+        self.assertEqual(loaded_config.poll_interval, 7)
+
 
 if __name__ == '__main__':
     unittest.main()

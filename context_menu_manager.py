@@ -258,7 +258,8 @@ class ContextMenuManager:
 
         try:
             if sys.platform == "win32":
-                subprocess.Popen(['cmd', '/c', 'start', 'cmd', '/k', 'ping', '-t', ip])
+                title = f"Ping {label} ({ip})" if label else f"Ping {ip}"
+                subprocess.Popen(['cmd', '/c', 'start', title, 'cmd', '/k', 'ping', '-t', ip])
             else:
                 subprocess.Popen(['xterm', '-e', 'ping', ip])
         except Exception as e:

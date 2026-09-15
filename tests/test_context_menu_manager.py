@@ -68,6 +68,32 @@ class TestContextMenuManager(unittest.TestCase):
     @patch("context_menu_manager.subprocess.Popen")
     @patch("context_menu_manager.sys")
     @patch("context_menu_manager.QMessageBox.warning")
+    def test_ping_cmd_windows_explicit_title(self, mock_warning, mock_sys, mock_popen):
+        """Test that Windows cmd start includes explicit window title."""
+        mock_sys.platform = "win32"
+        self.manager._ping_cmd("192.168.1.10", label="ATM-01")
+
+        mock_warning.assert_not_called()
+        mock_popen.assert_called_once()
+        args = mock_popen.call_args[0][0]
+        self.assertEqual(args, ['cmd', '/c', 'start', 'Ping ATM-01 (192.168.1.10)', 'cmd', '/k', 'ping', '-t', '192.168.1.10'])
+
+    @patch("context_menu_manager.subprocess.Popen")
+    @patch("context_menu_manager.sys")
+    @patch("context_menu_manager.QMessageBox.warning")
+    def test_ping_cmd_windows_without_label(self, mock_warning, mock_sys, mock_popen):
+        """Test that Windows cmd start without label uses IP in title."""
+        mock_sys.platform = "win32"
+        self.manager._ping_cmd("192.168.1.10")
+
+        mock_warning.assert_not_called()
+        mock_popen.assert_called_once()
+        args = mock_popen.call_args[0][0]
+        self.assertEqual(args, ['cmd', '/c', 'start', 'Ping 192.168.1.10', 'cmd', '/k', 'ping', '-t', '192.168.1.10'])
+
+    @patch("context_menu_manager.subprocess.Popen")
+    @patch("context_menu_manager.sys")
+    @patch("context_menu_manager.QMessageBox.warning")
     def test_ping_cmd_linux_safe_args(self, mock_warning, mock_sys, mock_popen):
         """Test that non-Windows uses list arguments instead of formatted shell string."""
         mock_sys.platform = "linux"

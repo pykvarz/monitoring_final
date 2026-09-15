@@ -5,7 +5,8 @@ Dependency Injection Container
 Управляет зависимостями и их жизненным циклом
 """
 
-from typing import Dict, Type, Any, Callable
+from typing import Dict, Type, Any, Callable, Optional, Union
+from pathlib import Path
 import logging
 
 
@@ -123,12 +124,22 @@ def get_container() -> DIContainer:
     return _global_container
 
 
-def setup_container() -> DIContainer:
+def setup_container(base_dir: Optional[Union[str, Path]] = None) -> DIContainer:
     """
     Настройка и конфигурация DI контейнера
     Регистрация всех сервисов приложения
     """
     container = get_container()
+    
+    import sys
+    from pathlib import Path
+
+    if base_dir is not None:
+        app_dir = Path(base_dir)
+    elif getattr(sys, 'frozen', False):
+        app_dir = Path(sys.executable).resolve().parent
+    else:
+        app_dir = Path(__file__).resolve().parent
     
     # Импорты здесь, чтобы избежать циклических зависимостей
     from storage import StorageManager
@@ -139,10 +150,8 @@ def setup_container() -> DIContainer:
     from data_manager import DataManager
     
     # Регистрация Core (Single Source of Truth)
-    # Используем Repository как Adapter для DataManager или оставляем как есть,
-    # Но для SQLite миграции нам нужен DataManager и DatabaseManager
-    
-    db_manager = DatabaseManager()
+    db_path = str(app_dir / "hosts.db")
+    db_manager = DatabaseManager(db_name=db_path)
     container.register_singleton(DatabaseManager, db_manager)
     
     data_manager = DataManager(db_manager)
@@ -153,9 +162,9 @@ def setup_container() -> DIContainer:
     container.register_singleton(HostRepository, host_repository)
     
     # Регистрация Infrastructure сервисов
-    container.register_singleton(IStorageRepository, StorageManager())
+    container.register_singleton(IStorageRepository, StorageManager(base_dir=app_dir))
     container.register_singleton(IPingService, PingService())
     container.register_singleton(INotificationService, NotificationService())
     
-    logging.info("DI Container configured successfully")
+    logging.info(f"DI Container configured successfully with base_dir={app_dir}")
     return container
