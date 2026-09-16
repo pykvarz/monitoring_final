@@ -69,10 +69,11 @@ class HelpdeskService:
         if not config.helpdesk_enabled or not config.helpdesk_url:
             return
         cls._start_loop()
+        headless = getattr(config, 'helpdesk_headless', False)
         for host in hosts:
-            logging.info(f"HelpdeskService: Планирование заявки (Установить) для {host}")
+            logging.info(f"HelpdeskService: Планирование заявки (Установить) для {host} (headless={headless})")
             future = asyncio.run_coroutine_threadsafe(
-                asyncio.wait_for(cls._process_ticket_task_async(config.helpdesk_url, host, "Установить", reason), timeout=60.0),
+                asyncio.wait_for(cls._process_ticket_task_async(config.helpdesk_url, host, "Установить", reason, headless=headless), timeout=60.0),
                 cls._loop
             )
             cls._log_future_error(future, host, "Установить")
@@ -82,10 +83,11 @@ class HelpdeskService:
         if not config.helpdesk_enabled or not config.helpdesk_url:
             return
         cls._start_loop()
+        headless = getattr(config, 'helpdesk_headless', False)
         for host in hosts:
-            logging.info(f"HelpdeskService: Планирование заявки (Снять) для {host}")
+            logging.info(f"HelpdeskService: Планирование заявки (Снять) для {host} (headless={headless})")
             future = asyncio.run_coroutine_threadsafe(
-                asyncio.wait_for(cls._process_ticket_task_async(config.helpdesk_url, host, "Снять", reason), timeout=60.0),
+                asyncio.wait_for(cls._process_ticket_task_async(config.helpdesk_url, host, "Снять", reason, headless=headless), timeout=60.0),
                 cls._loop
             )
             cls._log_future_error(future, host, "Снять")
@@ -121,13 +123,13 @@ class HelpdeskService:
         return f"0000{name}"
 
     @staticmethod
-    async def _process_ticket_task_async(url: str, host_name: str, status_action: str, reason: str = "без связи"):
+    async def _process_ticket_task_async(url: str, host_name: str, status_action: str, reason: str = "без связи", headless: bool = False):
         try:
             from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
             
             url = HelpdeskService.normalize_url(url)
             async with async_playwright() as p:
-                logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}")
+                logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}, headless: {headless}")
                 domain = urllib.parse.urlparse(url).netloc
                 if ":" in domain:
                     domain = domain.split(":")[0]
@@ -140,8 +142,7 @@ class HelpdeskService:
                 browser = None
                 for channel in ["msedge", "chrome", None]:
                     try:
-                        # headless=False для наглядного отображения процесса пользователю
-                        kwargs = {"headless": False, "args": launch_args}
+                        kwargs = {"headless": headless, "args": launch_args}
                         if channel:
                             kwargs["channel"] = channel
                         browser = await p.chromium.launch(**kwargs)
@@ -257,8 +258,10 @@ class HelpdeskService:
                         await save_btn.wait_for(state="visible", timeout=15000)
                         await save_btn.click(timeout=5000)
                         await page.wait_for_load_state('networkidle', timeout=15000)
-                        # Пауза 2 секунды, чтобы пользователь успел увидеть результат в открытом окне
-                        await page.wait_for_timeout(2000)
+                        # Пауза 2 секунды в видимом режиме, чтобы пользователь успел увидеть результат
+                        if not headless:
+                            await page.wait_for_timeout(2000)
+
                         logging.info(f"Заявка ({status_action}) для {host_name} успешно создана.")
                         HelpdeskService.signals.ticket_created.emit(host_name, status_action)
                     except Exception as ex:

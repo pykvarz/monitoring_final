@@ -172,6 +172,7 @@ class AppConfig:
     event_log_geometry: List[int] = field(default_factory=list)
     helpdesk_enabled: bool = False
     helpdesk_url: str = ""
+    helpdesk_headless: bool = False
     helpdesk_reasons: List[str] = field(default_factory=lambda: ["без связи", "ошибка пинга", "техническое обслуживание"])
     helpdesk_reasons_recovered: List[str] = field(default_factory=lambda: ["восстановление связи", "после ремонта"])
 

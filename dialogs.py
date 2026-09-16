@@ -281,6 +281,10 @@ class SettingsDialog(QDialog):
         
         self._hd_enabled = QCheckBox("Включить интеграцию (Playwright)")
         self._hd_enabled.setChecked(getattr(self._config, 'helpdesk_enabled', False))
+
+        self._hd_headless = QCheckBox("Скрытый фоновый режим браузера (Headless)")
+        self._hd_headless.setChecked(getattr(self._config, 'helpdesk_headless', False))
+        self._hd_headless.setToolTip("Включено: браузер работает в фоне без показа окна.\nВыключено: на экране отображается окно браузера.")
         
         self._hd_url = QLineEdit(getattr(self._config, 'helpdesk_url', ''))
         self._hd_url.setPlaceholderText("https://helpdesk.company.com/create")
@@ -296,6 +300,7 @@ class SettingsDialog(QDialog):
         self._hd_reasons_recovered.setToolTip("Готовые варианты причин закрытия заявки (через запятую)")
         
         helpdesk_layout.addRow("", self._hd_enabled)
+        helpdesk_layout.addRow("", self._hd_headless)
         helpdesk_layout.addRow("URL создания заявки:", self._hd_url)
         helpdesk_layout.addRow("Причины открытия:", self._hd_reasons)
         helpdesk_layout.addRow("Причины закрытия:", self._hd_reasons_recovered)
@@ -373,6 +378,7 @@ class SettingsDialog(QDialog):
             history_retention_days=self._retention_spin.value(),
             helpdesk_enabled=self._hd_enabled.isChecked(),
             helpdesk_url=self._hd_url.text().strip(),
+            helpdesk_headless=self._hd_headless.isChecked(),
             helpdesk_reasons=[r.strip() for r in self._hd_reasons.text().split(",") if r.strip()],
             helpdesk_reasons_recovered=[r.strip() for r in self._hd_reasons_recovered.text().split(",") if r.strip()],
             column_widths=dict(self._config.column_widths),

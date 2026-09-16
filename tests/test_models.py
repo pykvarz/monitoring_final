@@ -322,6 +322,16 @@ class TestAppConfigModel(unittest.TestCase):
         self.assertIn('waiting_timeout', data)
         self.assertIn('max_workers', data)
 
+    def test_helpdesk_headless_config(self):
+        """Test helpdesk_headless default value and customization."""
+        config_default = AppConfig()
+        self.assertFalse(config_default.helpdesk_headless)
+
+        config_custom = AppConfig(helpdesk_headless=True)
+        self.assertTrue(config_custom.helpdesk_headless)
+        self.assertTrue(config_custom.to_dict()['helpdesk_headless'])
+
 
 if __name__ == '__main__':
     unittest.main()
+
