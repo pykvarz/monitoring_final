@@ -303,7 +303,15 @@ class PingService(IPingService):
                         reply_size,
                         timeout_ms
                     )
-                    return ret > 0
+                    if ret > 0:
+                        # В структуре ICMPV6_ECHO_REPLY поле Status (ULONG) находится со смещением 32
+                        # IPV6_ADDRESS_EX (32 байта) + Status (4 байта, 0 = IP_SUCCESS)
+                        try:
+                            status = struct.unpack_from('<I', reply_buffer.raw, 32)[0]
+                            return status == 0
+                        except Exception:
+                            return True
+                    return False
                 finally:
                     _IcmpCloseHandle(handle)
             except Exception as e:

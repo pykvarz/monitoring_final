@@ -5,7 +5,6 @@
 """
 import sys
 import logging
-import subprocess
 from datetime import datetime
 from typing import List, Dict
 from PyQt5.QtWidgets import (

@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Сервис для автоматического создания заявок в Helpdesk через Playwright.
-(Asyncio Version)
-"""
+import os
+import re
+import tempfile
 import logging
 import asyncio
 import threading
 import urllib.parse
+from typing import Optional
 from models import AppConfig
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -20,6 +18,7 @@ class HelpdeskService:
     _loop = None
     _thread = None
     _lock = threading.Lock()
+    _semaphore = None
     signals = HelpdeskSignals()
 
     SAVE_BUTTON_SELECTOR = (
@@ -27,6 +26,33 @@ class HelpdeskService:
         "div.g-button:has-text('Сохранить'), button:has-text('Сохранить'), "
         "[role='button']:has-text('Сохранить'), input[type='submit']"
     )
+
+    @classmethod
+    def _get_semaphore(cls) -> asyncio.Semaphore:
+        """Семафор для ограничения: не более 1 параллельной сессии браузера"""
+        if cls._semaphore is None:
+            cls._semaphore = asyncio.Semaphore(1)
+        return cls._semaphore
+
+    @staticmethod
+    def _get_error_screenshot_path(host_name: str) -> str:
+        """Безопасный путь к скриншоту ошибки в системной временной папке %TEMP%"""
+        clean_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', str(host_name or "unknown"))
+        return os.path.join(tempfile.gettempdir(), f"helpdesk_error_{clean_name}.png")
+
+    @classmethod
+    async def _capture_error_screenshot(cls, page, host_name: str) -> Optional[str]:
+        """Сохранение скриншота при ошибке в %TEMP%"""
+        if not page:
+            return None
+        try:
+            path = cls._get_error_screenshot_path(host_name)
+            await page.screenshot(path=path)
+            logging.info(f"Helpdesk: Скриншот ошибки сохранён: {path}")
+            return path
+        except Exception as e:
+            logging.debug(f"Helpdesk: Не удалось сохранить скриншот ошибки: {e}")
+            return None
 
     @classmethod
     def _start_loop(cls):
@@ -122,180 +148,166 @@ class HelpdeskService:
             return name
         return f"0000{name}"
 
-    @staticmethod
-    async def _process_ticket_task_async(url: str, host_name: str, status_action: str, reason: str = "без связи", headless: bool = False):
-        try:
-            from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-            
-            url = HelpdeskService.normalize_url(url)
-            async with async_playwright() as p:
-                logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}, headless: {headless}")
-                domain = urllib.parse.urlparse(url).netloc
-                if ":" in domain:
-                    domain = domain.split(":")[0]
+    @classmethod
+    async def _process_ticket_task_async(cls, url: str, host_name: str, status_action: str, reason: str = "без связи", headless: bool = False):
+        async with cls._get_semaphore():
+            page = None
+            browser = None
+            try:
+                from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
                 
-                # Запуск браузера: системный Microsoft Edge (по умолчанию на Windows), затем Chrome / встроенный Chromium
-                launch_args = [
-                    f'--auth-server-allowlist="{domain}"',
-                    '--disable-blink-features=AutomationControlled',
-                ]
-                browser = None
-                for channel in ["msedge", "chrome", None]:
-                    try:
-                        kwargs = {"headless": headless, "args": launch_args}
-                        if channel:
-                            kwargs["channel"] = channel
-                        browser = await p.chromium.launch(**kwargs)
-                        break
-                    except Exception:
-                        continue
-
-                if not browser:
-                    raise RuntimeError("Не удалось запустить браузер (Microsoft Edge или Chrome не найдены в системе)")
-
-                context = await browser.new_context()
-                page = await context.new_page()
-                
-                try:
-                    # Переход на страницу добавления заявки с явным таймаутом
-                    await page.goto(url, timeout=15000)
-                    await page.wait_for_load_state('networkidle', timeout=15000)
+                url = HelpdeskService.normalize_url(url)
+                async with async_playwright() as p:
+                    logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}, headless: {headless}")
+                    domain = urllib.parse.urlparse(url).netloc
+                    if ":" in domain:
+                        domain = domain.split(":")[0]
                     
-                    # Ожидание отрисовки контейнера формы Naumen SD (GWT)
-                    try:
-                        form_container = page.locator("#gwt-debug-buttons, #gwt-debug-apply, .formActions, xpath=//label[contains(text(), 'Местонахождение')]").first
-                        await form_container.wait_for(state="visible", timeout=15000)
-                    except Exception:
-                        logging.warning("Ожидание контейнера формы превысило таймаут, продолжаем попытку заполнения")
-
-                    
-                    # Асинхронная функция для выбора значения в выпадающем списке
-                    async def select_dropdown(label: str, text_to_select: str):
+                    # Запуск браузера: системный Microsoft Edge (по умолчанию на Windows), затем Chrome / встроенный Chromium
+                    launch_args = [
+                        f'--auth-server-allowlist="{domain}"',
+                        '--disable-blink-features=AutomationControlled',
+                    ]
+                    for channel in ["msedge", "chrome", None]:
                         try:
-                            label_el = page.locator(f"xpath=//label[contains(text(), '{label}')]")
-                            if await label_el.count() > 0:
-                                parent = label_el.locator("..")
+                            kwargs = {"headless": headless, "args": launch_args}
+                            if channel:
+                                kwargs["channel"] = channel
+                            browser = await p.chromium.launch(**kwargs)
+                            break
+                        except Exception:
+                            continue
 
-                                # 1. Проверяем стандартный HTML <select>
-                                select_el = parent.locator("select")
-                                if await select_el.count() > 0 and await select_el.first.is_visible():
-                                    try:
-                                        await select_el.first.select_option(label=text_to_select, timeout=3000)
-                                        await page.wait_for_timeout(400)
-                                        return
-                                    except Exception:
-                                        pass
+                    if not browser:
+                        raise RuntimeError("Не удалось запустить браузер (Microsoft Edge или Chrome не найдены в системе)")
 
-                                # 2. Для кастомных выпадающих списков (Select2, комбобоксы)
-                                input_el = parent.locator("input, select, .select2-selection, .combo-box, [role='combobox']").first
-                                await input_el.click(timeout=3000)
-                                await page.wait_for_timeout(300)
-                                option = page.get_by_text(text_to_select, exact=True).last
-                                await option.click(timeout=3000)
-                                await page.wait_for_timeout(400)
-                        except Exception as ex:
-                            logging.warning(f"Не удалось заполнить '{label}': {ex}")
-
-                    # Заполняем каскадные выпадающие списки:
-                    # - "Тип заявки" не трогаем (автоматически заполнен при открытии ссылки)
-                    await select_dropdown("Соглашение/Услуга", "Устройство самообслуживания")
-                    await select_dropdown("Категория услуги", "ATM")
-                    await select_dropdown("Подкатегория", "Статус 13")
-
-                    # - "Шаблон" и "Режим работы" автоматически заполняются веб-формой при выборе "Подкатегория".
-                    # Даем странице время отработать встроенные AJAX-скрипты автозаполнения:
-                    try:
-                        await page.wait_for_load_state('networkidle', timeout=3000)
-                    except Exception:
-                        await page.wait_for_timeout(1000)
+                    context = await browser.new_context()
+                    page = await context.new_page()
                     
-                    # Форматируем номер банкомата с добавлением префикса 0000
-                    formatted_name = HelpdeskService.format_atm_number(host_name)
-
-                    # Текстовые поля
                     try:
-                        loc_box = page.locator("xpath=//label[contains(text(), 'Местонахождение')]/..//input")
-                        if await loc_box.count() > 0:
-                            await loc_box.first.fill(formatted_name)
-                    except Exception:
-                        pass
-
-                    try:
-                        subj_box = page.locator("xpath=//label[contains(text(), 'Тема')]/..//input")
-                        if await subj_box.count() > 0:
-                            await subj_box.first.fill(f"Лог. номер ATM: {formatted_name}")
-                    except Exception:
-                        pass
-                    
-                    description = (
-                        f"1. Лог. № банкомата: {formatted_name}\n"
-                        f"2. Статус: Установить/Снять: {status_action}\n"
-                        f"3. Причина: {reason}"
-                    )
-                    try:
-                        desc_box = page.locator("xpath=//label[contains(text(), 'Описание')]/..//*[self::textarea or @contenteditable='true']")
-                        if await desc_box.count() > 0:
-                            await desc_box.first.fill(description)
-                        else:
-                            frames = page.frames
-                            for f in frames:
-                                body = f.locator("body")
-                                if await body.count() > 0 and await body.get_attribute("contenteditable") == "true":
-                                    await body.fill(description)
-                                    break
-                    except Exception as ex:
-                        logging.warning(f"Не удалось заполнить 'Описание': {ex}")
-
-                    # Снимок экрана перед сохранением (для визуального контроля)
-                    try:
-                        await page.screenshot(path="helpdesk_preview.png")
-                    except Exception:
-                        pass
-
-                    # Нажимаем кнопку Сохранить (GWT Naumen SD: #gwt-debug-apply)
-                    try:
-                        save_btn = page.locator(HelpdeskService.SAVE_BUTTON_SELECTOR).first
-                        await save_btn.wait_for(state="visible", timeout=15000)
-                        await save_btn.click(timeout=5000)
+                        # Переход на страницу добавления заявки с явным таймаутом
+                        await page.goto(url, timeout=15000)
                         await page.wait_for_load_state('networkidle', timeout=15000)
-                        # Пауза 2 секунды в видимом режиме, чтобы пользователь успел увидеть результат
-                        if not headless:
-                            await page.wait_for_timeout(2000)
-
-                        logging.info(f"Заявка ({status_action}) для {host_name} успешно создана.")
-                        HelpdeskService.signals.ticket_created.emit(host_name, status_action)
-                    except Exception as ex:
-                        logging.error(f"Ошибка при сохранении заявки: {ex}")
+                        
+                        # Ожидание отрисовки контейнера формы Naumen SD (GWT)
                         try:
-                            await page.screenshot(path="helpdesk_error.png")
+                            form_container = page.locator("#gwt-debug-buttons, #gwt-debug-apply, .formActions, xpath=//label[contains(text(), 'Местонахождение')]").first
+                            await form_container.wait_for(state="visible", timeout=15000)
+                        except Exception:
+                            logging.warning("Ожидание контейнера формы превысило таймаут, продолжаем попытку заполнения")
+
+                        
+                        # Асинхронная функция для выбора значения в выпадающем списке
+                        async def select_dropdown(label: str, text_to_select: str):
+                            try:
+                                label_el = page.locator(f"xpath=//label[contains(text(), '{label}')]")
+                                if await label_el.count() > 0:
+                                    parent = label_el.locator("..")
+
+                                    # 1. Проверяем стандартный HTML <select>
+                                    select_el = parent.locator("select")
+                                    if await select_el.count() > 0 and await select_el.first.is_visible():
+                                        try:
+                                            await select_el.first.select_option(label=text_to_select, timeout=3000)
+                                            await page.wait_for_timeout(400)
+                                            return
+                                        except Exception:
+                                            pass
+
+                                    # 2. Для кастомных выпадающих списков (Select2, комбобоксы)
+                                    input_el = parent.locator("input, select, .select2-selection, .combo-box, [role='combobox']").first
+                                    await input_el.click(timeout=3000)
+                                    await page.wait_for_timeout(300)
+                                    option = page.get_by_text(text_to_select, exact=True).last
+                                    await option.click(timeout=3000)
+                                    await page.wait_for_timeout(400)
+                            except Exception as ex:
+                                logging.warning(f"Не удалось заполнить '{label}': {ex}")
+
+                        # Заполняем каскадные выпадающие списки:
+                        # - "Тип заявки" не трогаем (автоматически заполнен при открытии ссылки)
+                        await select_dropdown("Соглашение/Услуга", "Устройство самообслуживания")
+                        await select_dropdown("Категория услуги", "ATM")
+                        await select_dropdown("Подкатегория", "Статус 13")
+
+                        # - "Шаблон" и "Режим работы" автоматически заполняются веб-формой при выборе "Подкатегория".
+                        # Даем странице время отработать встроенные AJAX-скрипты автозаполнения:
+                        try:
+                            await page.wait_for_load_state('networkidle', timeout=3000)
+                        except Exception:
+                            await page.wait_for_timeout(1000)
+                        
+                        # Форматируем номер банкомата с добавлением префикса 0000
+                        formatted_name = HelpdeskService.format_atm_number(host_name)
+
+                        # Текстовые поля
+                        try:
+                            loc_box = page.locator("xpath=//label[contains(text(), 'Местонахождение')]/..//input")
+                            if await loc_box.count() > 0:
+                                await loc_box.first.fill(formatted_name)
                         except Exception:
                             pass
-                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Ошибка кнопки 'Сохранить': {ex}")
 
-                except PlaywrightTimeoutError as e:
-                    logging.error(f"Таймаут Playwright при обработке {host_name} ({url})")
-                    try:
-                        await page.screenshot(path="helpdesk_error.png")
-                    except Exception:
-                        pass
-                    HelpdeskService.signals.ticket_failed.emit(host_name, status_action, "Таймаут страницы (Playwright)")
-                except asyncio.TimeoutError as e:
-                    logging.error(f"Глобальный таймаут при обработке {host_name} ({url})")
-                    try:
-                        await page.screenshot(path="helpdesk_error.png")
-                    except Exception:
-                        pass
-                    HelpdeskService.signals.ticket_failed.emit(host_name, status_action, "Глобальный таймаут")
-                except Exception as e:
-                    logging.error(f"Ошибка в процессе заполнения заявки для {host_name}: {e}")
-                    try:
-                        await page.screenshot(path="helpdesk_error.png")
-                    except Exception:
-                        pass
-                    HelpdeskService.signals.ticket_failed.emit(host_name, status_action, str(e))
-                finally:
-                    await browser.close()
-                    
-        except Exception as e:
-            logging.error(f"Глобальная ошибка HelpdeskService ({host_name}): {e}", exc_info=True)
-            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Глобальная ошибка: {e}")
+                        try:
+                            subj_box = page.locator("xpath=//label[contains(text(), 'Тема')]/..//input")
+                            if await subj_box.count() > 0:
+                                await subj_box.first.fill(f"Лог. номер ATM: {formatted_name}")
+                        except Exception:
+                            pass
+                        
+                        description = (
+                            f"1. Лог. № банкомата: {formatted_name}\n"
+                            f"2. Статус: Установить/Снять: {status_action}\n"
+                            f"3. Причина: {reason}"
+                        )
+                        try:
+                            desc_box = page.locator("xpath=//label[contains(text(), 'Описание')]/..//*[self::textarea or @contenteditable='true']")
+                            if await desc_box.count() > 0:
+                                await desc_box.first.fill(description)
+                            else:
+                                frames = page.frames
+                                for f in frames:
+                                    body = f.locator("body")
+                                    if await body.count() > 0 and await body.get_attribute("contenteditable") == "true":
+                                        await body.fill(description)
+                                        break
+                        except Exception as ex:
+                            logging.warning(f"Не удалось заполнить 'Описание': {ex}")
+
+                        # Нажимаем кнопку Сохранить (GWT Naumen SD: #gwt-debug-apply)
+                        try:
+                            save_btn = page.locator(HelpdeskService.SAVE_BUTTON_SELECTOR).first
+                            await save_btn.wait_for(state="visible", timeout=15000)
+                            await save_btn.click(timeout=5000)
+                            await page.wait_for_load_state('networkidle', timeout=15000)
+                            # Пауза 2 секунды в видимом режиме, чтобы пользователь успел увидеть результат
+                            if not headless:
+                                await page.wait_for_timeout(2000)
+
+                            logging.info(f"Заявка ({status_action}) для {host_name} успешно создана.")
+                            HelpdeskService.signals.ticket_created.emit(host_name, status_action)
+                        except Exception as ex:
+                            logging.error(f"Ошибка при сохранении заявки: {ex}")
+                            await cls._capture_error_screenshot(page, host_name)
+                            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Ошибка кнопки 'Сохранить': {ex}")
+
+                    except PlaywrightTimeoutError as e:
+                        logging.error(f"Таймаут Playwright при обработке {host_name} ({url})")
+                        await cls._capture_error_screenshot(page, host_name)
+                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, "Таймаут страницы (Playwright)")
+                    except asyncio.TimeoutError as e:
+                        logging.error(f"Глобальный таймаут при обработке {host_name} ({url})")
+                        await cls._capture_error_screenshot(page, host_name)
+                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, "Глобальный таймаут")
+                    except Exception as e:
+                        logging.error(f"Ошибка в процессе заполнения заявки для {host_name}: {e}")
+                        await cls._capture_error_screenshot(page, host_name)
+                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, str(e))
+                    finally:
+                        if browser:
+                            await browser.close()
+                            
+            except Exception as e:
+                logging.error(f"Глобальная ошибка HelpdeskService ({host_name}): {e}", exc_info=True)
+                HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Глобальная ошибка: {e}")
+

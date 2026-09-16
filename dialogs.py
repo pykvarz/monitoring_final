@@ -139,11 +139,12 @@ class HostDialog(QDialog):
 
     def get_host(self) -> Host:
         """Получение данных узла"""
+        grp = self._group_combo.currentText().strip() or "Без группы"
         if self._host:
             self._host.name = self._name_edit.text().strip()
             self._host.ip = self._ip_edit.text().strip()
             self._host.address = self._address_edit.text().strip()
-            self._host.group = self._group_combo.currentText() or "Без группы"
+            self._host.group = grp
             self._host.notifications_enabled = self._notify_check.isChecked()
             return self._host
         else:
@@ -151,7 +152,7 @@ class HostDialog(QDialog):
                 name=self._name_edit.text().strip(),
                 ip=self._ip_edit.text().strip(),
                 address=self._address_edit.text().strip(),
-                group=self._group_combo.currentText() or "Без группы",
+                group=grp,
                 notifications_enabled=self._notify_check.isChecked()
             )
 

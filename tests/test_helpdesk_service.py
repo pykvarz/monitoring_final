@@ -69,6 +69,14 @@ class TestHelpdeskServiceUrlAndSelectors(unittest.TestCase):
         config.helpdesk_headless = False
         HelpdeskService.process_recovered(["test_host"], config)
 
+    def test_error_screenshot_path_in_temp(self):
+        """Проверка генерации пути скриншота ошибки во временной папке tempfile."""
+        import tempfile, os
+        path = HelpdeskService._get_error_screenshot_path("ATM-01 & test")
+        self.assertTrue(path.startswith(tempfile.gettempdir()))
+        self.assertIn("helpdesk_error_ATM-01___test.png", path)
+
+
 
 class TestSettingsDialogHelpdeskHeadless(unittest.TestCase):
     """Тестирование переключателя headless в SettingsDialog."""
