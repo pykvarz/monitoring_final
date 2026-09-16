@@ -7,7 +7,7 @@ ThemeManager - Управление темами оформления прило
 import sys
 import ctypes
 from typing import Callable
-from PyQt5.QtWidgets import QMainWindow, QPushButton, QHBoxLayout, QLabel, QTableView, QApplication
+from PyQt5.QtWidgets import QMainWindow, QPushButton, QHBoxLayout, QLabel, QTableView, QApplication, QProxyStyle, QStyle
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QPalette, QColor
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtCore import QByteArray, Qt
@@ -24,6 +24,14 @@ from constants import (
     COLOR_TOTAL
 )
 from ui_components import UIComponents
+
+
+class AppStyle(QProxyStyle):
+    """Кастомный стиль на базе Fusion, гарантирующий классическое раскрытие QComboBox строго вниз"""
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.SH_ComboBox_Popup:
+            return 0
+        return super().styleHint(hint, option, widget, returnData)
 
 
 def set_dark_titlebar(widget, dark: bool = True) -> None:
@@ -46,6 +54,8 @@ def apply_app_palette(theme: str = "dark") -> None:
     app = QApplication.instance()
     if not app:
         return
+    if not isinstance(app.style(), AppStyle):
+        app.setStyle(AppStyle('Fusion'))
     palette = QPalette()
     if theme == "tactical":
         palette.setColor(QPalette.Window, QColor("#090A0F"))

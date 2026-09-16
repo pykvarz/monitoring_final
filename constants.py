@@ -330,10 +330,9 @@ def get_main_style(theme="dark"):
             background-color: {TACTICAL_SURFACE};
             border: 1px solid {TACTICAL_BORDER};
             border-radius: 0px;
-            padding: 5px 16px;
+            padding: 4px 12px;
             color: {TACTICAL_TEXT};
             font-weight: 500;
-            min-width: 65px;
             font-family: {font_family};
         }}
         QPushButton:hover {{
@@ -347,6 +346,10 @@ def get_main_style(theme="dark"):
             background-color: {TACTICAL_BG};
             border-color: {TACTICAL_BORDER};
             color: #4a5568;
+        }}
+        QDialogButtonBox QPushButton, QMessageBox QPushButton {{
+            min-width: 65px;
+            padding: 5px 16px;
         }}
         QListWidget, QListView {{
             background-color: {TACTICAL_SURFACE};
@@ -511,10 +514,9 @@ def get_main_style(theme="dark"):
             background-color: #1c202a;
             border: 1px solid #282e3d;
             border-radius: 6px;
-            padding: 5px 16px;
+            padding: 4px 12px;
             color: #f1f5f9;
             font-weight: 500;
-            min-width: 65px;
         }}
         QPushButton:hover {{
             background-color: #252b38;
@@ -527,6 +529,10 @@ def get_main_style(theme="dark"):
             background-color: #181c26;
             border-color: #222734;
             color: #64748b;
+        }}
+        QDialogButtonBox QPushButton, QMessageBox QPushButton {{
+            min-width: 65px;
+            padding: 5px 16px;
         }}
         QListWidget, QListView {{
             background-color: #181c26;

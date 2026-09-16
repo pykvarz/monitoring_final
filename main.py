@@ -51,8 +51,9 @@ def main():
             except Exception:
                 pass
 
+        from theme_manager import AppStyle
         app = QApplication(sys.argv)
-        app.setStyle('Fusion')
+        app.setStyle(AppStyle('Fusion'))
         app.setApplicationName("Network Monitor")
         app.setApplicationDisplayName("Network Monitor")
         logging.debug("QApplication создан")

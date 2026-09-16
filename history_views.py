@@ -230,7 +230,7 @@ class EventLogPanel(QFrame):
         for label, _ in self.STATUS_FILTER_OPTIONS:
             self._status_combo.addItem(label)
         self._status_combo.currentIndexChanged.connect(self.refresh)
-        self._status_combo.setMaximumWidth(95)
+        self._status_combo.setMinimumWidth(110)
         self._status_combo.setFixedHeight(26)
         header_row.addWidget(self._status_combo)
 
@@ -240,6 +240,10 @@ class EventLogPanel(QFrame):
                 border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
                 border-radius: 5px;
                 padding: 3px;
+                min-width: 0px;
+                max-width: 26px;
+                min-height: 26px;
+                max-height: 26px;
             }}
             QPushButton:hover {{
                 background-color: {'#2a1619' if is_dark else '#fee2e2'};
@@ -260,6 +264,10 @@ class EventLogPanel(QFrame):
                 border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
                 border-radius: 5px;
                 padding: 3px;
+                min-width: 0px;
+                max-width: 26px;
+                min-height: 26px;
+                max-height: 26px;
             }}
             QPushButton:hover {{
                 background-color: {'#172554' if is_dark else '#eff6ff'};
@@ -415,6 +423,10 @@ class EventLogPanel(QFrame):
                     border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
                     border-radius: 5px;
                     padding: 3px;
+                    min-width: 0px;
+                    max-width: 26px;
+                    min-height: 26px;
+                    max-height: 26px;
                 }}
                 QPushButton:hover {{
                     background-color: {'#2a1619' if is_dark else '#fee2e2'};
@@ -429,6 +441,10 @@ class EventLogPanel(QFrame):
                     border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
                     border-radius: 5px;
                     padding: 3px;
+                    min-width: 0px;
+                    max-width: 26px;
+                    min-height: 26px;
+                    max-height: 26px;
                 }}
                 QPushButton:hover {{
                     background-color: {'#172554' if is_dark else '#eff6ff'};
@@ -465,6 +481,10 @@ class EventLogPanel(QFrame):
                 border: 1px solid {'#2a2f3d' if is_dark else '#d0d7de'};
                 border-radius: 5px;
                 padding: 3px;
+                min-width: 0px;
+                max-width: 26px;
+                min-height: 26px;
+                max-height: 26px;
             }}
             QPushButton:hover {{
                 background-color: {'#172554' if is_dark else '#eff6ff'};
@@ -492,6 +512,10 @@ class EventLogPanel(QFrame):
                         border: 1px solid {pin_border};
                         border-radius: 5px;
                         padding: 3px;
+                        min-width: 0px;
+                        max-width: 26px;
+                        min-height: 26px;
+                        max-height: 26px;
                     }}
                     QPushButton:hover {{
                         background-color: {'#1e3a8a' if is_dark else '#dbeafe'};

@@ -105,6 +105,9 @@ Windows 10/11. Поставка в виде автономного `.exe` (PyIns
 - [x] Сборка .exe (PyInstaller + build_exe.py)
 
 ### Последние обновления
+- **2026-09-16 — исправление раскрытия списков QComboBox (строго вниз) и нормализация кнопок журнала событий:**
+  - Направление выпадающих списков (`theme_manager.py`, `main.py`): переопределен хинт `SH_ComboBox_Popup = 0` через `AppStyle(QProxyStyle)` поверх Fusion. Выпадающие списки больше не центрируются вверх поверх родительского виджета с выталкиванием пунктов вверх, а раскрываются строго вниз.
+  - Геометрия кнопок журнала (`constants.py`, `history_views.py`): ограничение `min-width: 65px` снято с общего селектора `QPushButton` и перенесено строго на `QDialogButtonBox` / `QMessageBox`. Для иконочных кнопок `_btn_clear`, `_btn_refresh`, `_btn_dock`, `_btn_pin` жестко заданы границы `min-width: 0px; max-width: 26px; min-height: 26px; max-height: 26px;`, устранив растяжение кнопок. Ширина комбобокса статусов расширена до `min-width: 110px`, устранив обрезку текста («Тех.обслуживание»).
 - **2026-09-16 — устранение белого фона кнопок и списков в диалогах (стилизация QSS):**
   - В `constants.py` расширены стили `get_main_style` для тем Dark и Tactical: добавлены глобальные правила для `QPushButton` (состояния default, hover, pressed, disabled) и `QListWidget, QListView` (фон, границы, цвет текста и выделения).
   - В `dialogs.py` устранена потеря наследования стилей: удалены жесткие локальные вызовы `setStyleSheet("QGroupBox { font-weight: bold; }")` у групп параметров в `SettingsDialog`, которые ломали стилизацию вложенных кнопок (`manage_groups_btn`).
