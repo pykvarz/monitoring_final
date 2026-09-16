@@ -326,7 +326,7 @@ def get_main_style(theme="dark"):
             color: {TACTICAL_TEXT};
             spacing: 6px;
         }}
-        QDialogButtonBox QPushButton, QMessageBox QPushButton {{
+        QPushButton {{
             background-color: {TACTICAL_SURFACE};
             border: 1px solid {TACTICAL_BORDER};
             border-radius: 0px;
@@ -336,12 +336,38 @@ def get_main_style(theme="dark"):
             min-width: 65px;
             font-family: {font_family};
         }}
-        QDialogButtonBox QPushButton:hover, QMessageBox QPushButton:hover {{
+        QPushButton:hover {{
             background-color: {TACTICAL_BORDER};
             border-color: {TACTICAL_TEXT_SECONDARY};
         }}
-        QDialogButtonBox QPushButton:pressed, QMessageBox QPushButton:pressed {{
+        QPushButton:pressed {{
             background-color: {TACTICAL_SELECTION};
+        }}
+        QPushButton:disabled {{
+            background-color: {TACTICAL_BG};
+            border-color: {TACTICAL_BORDER};
+            color: #4a5568;
+        }}
+        QListWidget, QListView {{
+            background-color: {TACTICAL_SURFACE};
+            color: {TACTICAL_TEXT};
+            border: 1px solid {TACTICAL_BORDER};
+            border-radius: 0px;
+            padding: 4px;
+            font-family: {font_family};
+            outline: none;
+        }}
+        QListWidget::item, QListView::item {{
+            padding: 6px 10px;
+            border-radius: 0px;
+            color: {TACTICAL_TEXT};
+        }}
+        QListWidget::item:selected, QListView::item:selected {{
+            background-color: {TACTICAL_SELECTION};
+            color: #ffffff;
+        }}
+        QListWidget::item:hover:!selected, QListView::item:hover:!selected {{
+            background-color: {TACTICAL_BORDER};
         }}
         QToolTip {{
             background-color: {TACTICAL_SURFACE};
@@ -481,7 +507,7 @@ def get_main_style(theme="dark"):
             color: #f1f5f9;
             spacing: 6px;
         }}
-        QDialogButtonBox QPushButton, QMessageBox QPushButton {{
+        QPushButton {{
             background-color: #1c202a;
             border: 1px solid #282e3d;
             border-radius: 6px;
@@ -490,12 +516,37 @@ def get_main_style(theme="dark"):
             font-weight: 500;
             min-width: 65px;
         }}
-        QDialogButtonBox QPushButton:hover, QMessageBox QPushButton:hover {{
+        QPushButton:hover {{
             background-color: #252b38;
             border-color: #3b82f6;
         }}
-        QDialogButtonBox QPushButton:pressed, QMessageBox QPushButton:pressed {{
+        QPushButton:pressed {{
             background-color: #151820;
+        }}
+        QPushButton:disabled {{
+            background-color: #181c26;
+            border-color: #222734;
+            color: #64748b;
+        }}
+        QListWidget, QListView {{
+            background-color: #181c26;
+            color: #f1f5f9;
+            border: 1px solid #282e3d;
+            border-radius: 6px;
+            padding: 4px;
+            outline: none;
+        }}
+        QListWidget::item, QListView::item {{
+            padding: 6px 10px;
+            border-radius: 4px;
+            color: #f1f5f9;
+        }}
+        QListWidget::item:selected, QListView::item:selected {{
+            background-color: #2563eb;
+            color: #ffffff;
+        }}
+        QListWidget::item:hover:!selected, QListView::item:hover:!selected {{
+            background-color: #252b38;
         }}
         QScrollBar:vertical {{
             background-color: #151820;

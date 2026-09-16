@@ -191,7 +191,6 @@ class SettingsDialog(QDialog):
 
         # Группа: Таймауты
         timeout_group = QGroupBox("Интервалы опроса")
-        timeout_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         timeout_layout = QFormLayout()
         timeout_layout.setLabelAlignment(Qt.AlignRight)
 
@@ -223,7 +222,6 @@ class SettingsDialog(QDialog):
 
         # Группа: Производительность
         perf_group = QGroupBox("Производительность")
-        perf_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         perf_layout = QFormLayout()
         perf_layout.setLabelAlignment(Qt.AlignRight)
 
@@ -238,8 +236,7 @@ class SettingsDialog(QDialog):
 
         # Группа: Уведомления
         notify_group = QGroupBox("Уведомления")
-        notify_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        notify_layout = QVBox()
+        notify_layout = QVBoxLayout()
         notify_layout.setContentsMargins(10, 20, 10, 10)
 
         self._notify_enabled = QCheckBox("Включить уведомления")
@@ -256,7 +253,6 @@ class SettingsDialog(QDialog):
 
         # Группа: Журнал истории
         history_group = QGroupBox("Журнал событий")
-        history_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         history_layout = QFormLayout()
         history_layout.setLabelAlignment(Qt.AlignRight)
 
@@ -275,7 +271,6 @@ class SettingsDialog(QDialog):
 
         # Группа: Интеграция с Helpdesk
         helpdesk_group = QGroupBox("Интеграция с Helpdesk")
-        helpdesk_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         helpdesk_layout = QFormLayout()
         helpdesk_layout.setLabelAlignment(Qt.AlignRight)
         
@@ -308,7 +303,6 @@ class SettingsDialog(QDialog):
 
         # Группа: Внешний вид
         appearance_group = QGroupBox("Внешний вид")
-        appearance_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         appearance_layout = QFormLayout()
         appearance_layout.setLabelAlignment(Qt.AlignRight)
         
@@ -325,7 +319,6 @@ class SettingsDialog(QDialog):
 
         # Группа: Группы узлов
         groups_box = QGroupBox("Группы узлов")
-        groups_box.setStyleSheet("QGroupBox { font-weight: bold; }")
         groups_layout = QHBoxLayout()
         manage_groups_btn = QPushButton("Управление группами...")
         manage_groups_btn.setIcon(UIComponents._get_qicon(get_svg_edit(self._theme)))
@@ -451,6 +444,9 @@ class GroupManagerDialog(QDialog):
 
         # Нижняя кнопка закрытия
         btn_box = QDialogButtonBox(QDialogButtonBox.Close)
+        close_btn = btn_box.button(QDialogButtonBox.Close)
+        if close_btn:
+            close_btn.setText("Закрыть")
         btn_box.rejected.connect(self.accept)
         layout.addWidget(btn_box)
 
