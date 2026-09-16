@@ -113,7 +113,9 @@ class PingService(IPingService):
                 if isinstance(res, float):
                     return True
             except (OSError, ValueError, RuntimeError, PermissionError) as e:
-                logging.warning(f"Ошибка ping3 {ip}: {e} (будет использован системный ping)")
+                # На машинах без прав администратора переключаемся на системный ping без спама в лог-файл
+                logging.debug(f"Ошибка ping3 {ip}: {e} (будет использован системный ping)")
+
         
         # 2. Фоллбэк на системный ping (работает всегда)
         if PingService._system_ping(ip, timeout):

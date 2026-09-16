@@ -214,6 +214,17 @@ class TestFilterManager(unittest.TestCase):
         
         self.assertTrue(found)
 
+    def test_apply_filters_early_exit_no_hidden_rows(self):
+        """Проверка быстрого выхода (Early Exit), когда нет активных фильтров."""
+        self.search_edit.setText("")
+        self.group_filter.setCurrentText("Все группы")
+        self.status_filter.setCurrentText("📊 Все статусы")
+        self.filter_manager.set_dashboard_status_filter(None)
+        
+        self.filter_manager.apply_filters()
+        self.assertFalse(self.filter_manager._has_hidden_rows)
+
 
 if __name__ == '__main__':
     unittest.main()
+

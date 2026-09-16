@@ -360,9 +360,10 @@ class EventLogPanel(QFrame):
         status_filter = self.STATUS_FILTER_OPTIONS[idx][1] if 0 <= idx < len(self.STATUS_FILTER_OPTIONS) else None
 
         events = self._repository.get_history_events(
-            limit=200,
+            limit=30,  # Оптимизация UI: до 30 актуальных событий вместо 200 тяжелых виджетов
             status_filter=status_filter,
         )
+
 
         self._list.clear()
         if not events:

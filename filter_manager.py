@@ -42,7 +42,13 @@ class FilterManager:
         self._filter_timer.setInterval(300)
         self._filter_timer.timeout.connect(self._apply_filters_internal)
         
-        # Подключаем сигналы только если виджеты существуют
+        # Флаг наличия скрытых строк для быстрого выхода без обхода таблицы
+        self._has_hidden_rows = False
+
+        self._connect_signals()
+
+    def _connect_signals(self) -> None:
+        """Подключение сигналов от элементов фильтрации"""
         if self._search_edit:
             self._search_edit.textChanged.connect(self._schedule_filter)
         if self._group_filter:
@@ -59,7 +65,7 @@ class FilterManager:
         self.apply_filters()
 
     def apply_filters(self) -> None:
-        """Применение всех активных фильтров к таблице"""
+        """Применение всех активных фильтров к таблице (с оптимизацией Early Exit)"""
         search_text = self._search_edit.text().lower() if self._search_edit else ""
         
         # Получаем фильтры только если виджеты существуют
@@ -74,6 +80,26 @@ class FilterManager:
             status_filter = self._status_filter.currentText()
             if status_filter == "📊 Все статусы":
                 status_filter = None
+
+        has_active_filters = bool(
+            search_text 
+            or group_filter 
+            or status_filter 
+            or self._dashboard_status_filter
+        )
+
+        # Быстрый выход: если нет активных фильтров
+        if not has_active_filters:
+            if not self._has_hidden_rows:
+                return  # Ни одна строка не скрыта — мгновенный выход без обхода
+            # Если были скрытые строки, восстанавливаем видимость
+            for row in range(self._table_model.rowCount()):
+                if self._table.isRowHidden(row):
+                    self._table.setRowHidden(row, False)
+            self._has_hidden_rows = False
+            return
+
+        self._has_hidden_rows = True
 
         # Получаем данные о статусах для сопоставления заголовка и кода (ONLINE, etc)
         status_map = {s.title: s.name for s in HostStatus}
@@ -103,7 +129,9 @@ class FilterManager:
             if show and self._dashboard_status_filter:
                 show = host.status == self._dashboard_status_filter
 
-            self._table.setRowHidden(row, not show)
+            should_hide = not show
+            if self._table.isRowHidden(row) != should_hide:
+                self._table.setRowHidden(row, should_hide)
 
     def set_dashboard_status_filter(self, status: Optional[str]) -> None:
         """

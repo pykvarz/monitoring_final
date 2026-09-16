@@ -478,9 +478,6 @@ class MainWindow(QMainWindow):
             # Обновление статистики (легкое)
             self._update_dashboard_stats()
 
-            # EventLogPanel обновляется по таймеру автоматически
-            if getattr(self, "_event_log_panel", None):
-                self._event_log_panel.refresh()
 
     def _refresh_table(self, full_reload: bool = False):
         """Полная перезагрузка данных таблицы"""
@@ -530,6 +527,10 @@ class MainWindow(QMainWindow):
         self._scan_label.setText("✓")
         self._scan_label.setStyleSheet(SCAN_LABEL_STYLE_FINISHED)
         self._update_status_bar()
+        # Обновляем журнал событий один раз по завершении полного цикла сканирования
+        if getattr(self, "_event_log_panel", None):
+            self._event_log_panel.refresh()
+
 
     @pyqtSlot(list)
     def _on_hosts_offline(self, offline_hosts: List[str]):
