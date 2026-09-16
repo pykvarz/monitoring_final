@@ -423,6 +423,23 @@ def get_main_style(theme="dark"):
         QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
             background: none;
         }}
+        QSplitter::handle {{
+            background-color: transparent;
+        }}
+        QSplitter::handle:horizontal {{
+            width: 10px;
+            margin: 0px 4px;
+        }}
+        QSplitter::handle:horizontal:hover {{
+            background-color: #00F0FF;
+        }}
+        QSplitter::handle:vertical {{
+            height: 10px;
+            margin: 4px 0px;
+        }}
+        QSplitter::handle:vertical:hover {{
+            background-color: #00F0FF;
+        }}
         {get_combobox_style("tactical")}
         """
     font_family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
@@ -600,9 +617,21 @@ def get_main_style(theme="dark"):
         }}
         QSplitter::handle {{
             background-color: transparent;
-            width: 3px;
         }}
-        QSplitter::handle:hover {{
+        QSplitter::handle:horizontal {{
+            width: 10px;
+            margin: 0px 4px;
+            border-radius: 1px;
+        }}
+        QSplitter::handle:horizontal:hover {{
+            background-color: #3b82f6;
+        }}
+        QSplitter::handle:vertical {{
+            height: 10px;
+            margin: 4px 0px;
+            border-radius: 1px;
+        }}
+        QSplitter::handle:vertical:hover {{
             background-color: #3b82f6;
         }}
         {get_combobox_style(theme)}

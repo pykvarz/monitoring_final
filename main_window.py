@@ -342,6 +342,8 @@ class MainWindow(QMainWindow):
         self._event_log_panel = EventLogPanel(repository=None, theme=theme)  # repository задаётся в _init_managers
 
         self._content_splitter = QSplitter(Qt.Horizontal)
+        self._content_splitter.setHandleWidth(10)
+        self._content_splitter.setChildrenCollapsible(False)
         self._content_splitter.addWidget(self._table)
         self._content_splitter.addWidget(self._event_log_panel)
         self._content_splitter.setStretchFactor(0, 1)
