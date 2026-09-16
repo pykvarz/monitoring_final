@@ -35,5 +35,33 @@ class TestHelpdeskServiceFormatting(unittest.TestCase):
         self.assertEqual(HelpdeskService.format_atm_number(None), "")
 
 
+
+class TestHelpdeskServiceUrlAndSelectors(unittest.TestCase):
+    """Тестирование нормализации URL и селекторов кнопок Helpdesk."""
+
+    def test_normalize_url_adds_https(self):
+        """Проверка авто-добавления https:// к URL без схемы."""
+        raw = "helpdesk.eub.kz/sd/operator/#add:serviceCall$request"
+        normalized = HelpdeskService.normalize_url(raw)
+        self.assertEqual(normalized, "https://helpdesk.eub.kz/sd/operator/#add:serviceCall$request")
+
+    def test_normalize_url_preserves_existing_https(self):
+        """Проверка сохранения уже существующей схемы https://."""
+        raw = "https://helpdesk.eub.kz/sd/operator/"
+        self.assertEqual(HelpdeskService.normalize_url(raw), "https://helpdesk.eub.kz/sd/operator/")
+
+    def test_normalize_url_handles_empty(self):
+        """Проверка обработки пустых значений."""
+        self.assertEqual(HelpdeskService.normalize_url(""), "")
+        self.assertEqual(HelpdeskService.normalize_url("   "), "")
+        self.assertEqual(HelpdeskService.normalize_url(None), "")
+
+    def test_save_button_selector_contains_gwt_debug_apply(self):
+        """Проверка наличия точного идентификатора gwt-debug-apply в селекторе."""
+        self.assertIn("#gwt-debug-apply", HelpdeskService.SAVE_BUTTON_SELECTOR)
+        self.assertIn("g-button", HelpdeskService.SAVE_BUTTON_SELECTOR)
+
+
 if __name__ == '__main__':
     unittest.main()
+

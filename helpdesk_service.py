@@ -22,6 +22,12 @@ class HelpdeskService:
     _lock = threading.Lock()
     signals = HelpdeskSignals()
 
+    SAVE_BUTTON_SELECTOR = (
+        "#gwt-debug-apply, #gwt-debug-buttons .g-button, [id*='debug-apply'], "
+        "div.g-button:has-text('Сохранить'), button:has-text('Сохранить'), "
+        "[role='button']:has-text('Сохранить'), input[type='submit']"
+    )
+
     @classmethod
     def _start_loop(cls):
         with cls._lock:
@@ -85,6 +91,21 @@ class HelpdeskService:
             cls._log_future_error(future, host, "Снять")
 
     @staticmethod
+    def normalize_url(url: str) -> str:
+        """
+        Нормализует URL Helpdesk:
+        обрезает пробелы и гарантирует схему https://, если протокол не указан.
+        """
+        if not url:
+            return ""
+        url = str(url).strip()
+        if not url:
+            return ""
+        if not url.startswith("http://") and not url.startswith("https://"):
+            return f"https://{url}"
+        return url
+
+    @staticmethod
     def format_atm_number(host_name: str) -> str:
         """
         Форматирует имя хоста/номер банкомата для Helpdesk:
@@ -104,8 +125,9 @@ class HelpdeskService:
         try:
             from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
             
+            url = HelpdeskService.normalize_url(url)
             async with async_playwright() as p:
-                logging.info(f"Запуск Playwright для {host_name} ({status_action})")
+                logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}")
                 domain = urllib.parse.urlparse(url).netloc
                 if ":" in domain:
                     domain = domain.split(":")[0]
@@ -118,7 +140,8 @@ class HelpdeskService:
                 browser = None
                 for channel in ["msedge", "chrome", None]:
                     try:
-                        kwargs = {"headless": True, "args": launch_args}
+                        # headless=False для наглядного отображения процесса пользователю
+                        kwargs = {"headless": False, "args": launch_args}
                         if channel:
                             kwargs["channel"] = channel
                         browser = await p.chromium.launch(**kwargs)
@@ -136,6 +159,14 @@ class HelpdeskService:
                     # Переход на страницу добавления заявки с явным таймаутом
                     await page.goto(url, timeout=15000)
                     await page.wait_for_load_state('networkidle', timeout=15000)
+                    
+                    # Ожидание отрисовки контейнера формы Naumen SD (GWT)
+                    try:
+                        form_container = page.locator("#gwt-debug-buttons, #gwt-debug-apply, .formActions, xpath=//label[contains(text(), 'Местонахождение')]").first
+                        await form_container.wait_for(state="visible", timeout=15000)
+                    except Exception:
+                        logging.warning("Ожидание контейнера формы превысило таймаут, продолжаем попытку заполнения")
+
                     
                     # Асинхронная функция для выбора значения в выпадающем списке
                     async def select_dropdown(label: str, text_to_select: str):
@@ -214,29 +245,50 @@ class HelpdeskService:
                     except Exception as ex:
                         logging.warning(f"Не удалось заполнить 'Описание': {ex}")
 
-                    # Нажимаем кнопку Сохранить / Создать
+                    # Снимок экрана перед сохранением (для визуального контроля)
                     try:
-                        save_btn = page.locator("button:has-text('Сохранить'), button:has-text('Создать'), input[type='submit']").first
-                        if await save_btn.count() > 0:
-                            await save_btn.click(timeout=5000)
-                            await page.wait_for_load_state('networkidle', timeout=15000)
-                            logging.info(f"Заявка ({status_action}) для {host_name} успешно создана.")
-                            HelpdeskService.signals.ticket_created.emit(host_name, status_action)
-                        else:
-                            logging.error("Кнопка Сохранить/Создать не найдена.")
-                            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, "Кнопка Сохранить/Создать не найдена.")
+                        await page.screenshot(path="helpdesk_preview.png")
+                    except Exception:
+                        pass
+
+                    # Нажимаем кнопку Сохранить (GWT Naumen SD: #gwt-debug-apply)
+                    try:
+                        save_btn = page.locator(HelpdeskService.SAVE_BUTTON_SELECTOR).first
+                        await save_btn.wait_for(state="visible", timeout=15000)
+                        await save_btn.click(timeout=5000)
+                        await page.wait_for_load_state('networkidle', timeout=15000)
+                        # Пауза 2 секунды, чтобы пользователь успел увидеть результат в открытом окне
+                        await page.wait_for_timeout(2000)
+                        logging.info(f"Заявка ({status_action}) для {host_name} успешно создана.")
+                        HelpdeskService.signals.ticket_created.emit(host_name, status_action)
                     except Exception as ex:
                         logging.error(f"Ошибка при сохранении заявки: {ex}")
-                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, str(ex))
+                        try:
+                            await page.screenshot(path="helpdesk_error.png")
+                        except Exception:
+                            pass
+                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Ошибка кнопки 'Сохранить': {ex}")
 
                 except PlaywrightTimeoutError as e:
                     logging.error(f"Таймаут Playwright при обработке {host_name} ({url})")
+                    try:
+                        await page.screenshot(path="helpdesk_error.png")
+                    except Exception:
+                        pass
                     HelpdeskService.signals.ticket_failed.emit(host_name, status_action, "Таймаут страницы (Playwright)")
                 except asyncio.TimeoutError as e:
                     logging.error(f"Глобальный таймаут при обработке {host_name} ({url})")
+                    try:
+                        await page.screenshot(path="helpdesk_error.png")
+                    except Exception:
+                        pass
                     HelpdeskService.signals.ticket_failed.emit(host_name, status_action, "Глобальный таймаут")
                 except Exception as e:
                     logging.error(f"Ошибка в процессе заполнения заявки для {host_name}: {e}")
+                    try:
+                        await page.screenshot(path="helpdesk_error.png")
+                    except Exception:
+                        pass
                     HelpdeskService.signals.ticket_failed.emit(host_name, status_action, str(e))
                 finally:
                     await browser.close()
