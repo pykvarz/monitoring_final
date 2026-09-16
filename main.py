@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Network Monitor - Система мониторинга доступности сетевых узлов
-Требования: pip install PyQt5 ping3 plyer openpyxl
-Запуск от администратора (для ICMP ping)
+Требования: pip install PyQt5 openpyxl playwright
+На Windows работает без прав администратора через нативный Win32 ICMP (iphlpapi.dll)
 """
 
 import sys
