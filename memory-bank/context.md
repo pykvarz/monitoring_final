@@ -105,6 +105,11 @@ Windows 10/11. Поставка в виде автономного `.exe` (PyIns
 - [x] Сборка .exe (PyInstaller + build_exe.py)
 
 ### Последние обновления
+- **2026-09-17 — точные селекторы полей Naumen SD по подтвержденным gwt-debug ID:**
+  - В `helpdesk_service.py` внедрены прямые селекторы по подтвержденным GWT Debug ID инсталляции: `gwt-debug-agreementServiceProperty-value` («Соглашение/Услуга»), `gwt-debug-servCategory-value` («Категория услуги»), `gwt-debug-subCategory-value` («Подкатегория»), `gwt-debug-location-value` («Местонахождение»), `gwt-debug-shortDescr-value` («Тема»), `gwt-debug-description-value` («Описание»), `gwt-debug-apply` (кнопка «Сохранить»).
+  - Реализовано открытие кастомных выпадающих списков `formSelect` кликом по внешнему GWT-триггеру, регистронезависимый поиск элементов списка, паузы между каскадными AJAX-обновлениями списков, клавиатурный ввод через `press_sequentially` для GWT SuggestBox с фиксацией `ArrowDown` + `Enter`.
+  - В `fill_field` добавлена фиксация фокуса (`press("Tab")`) для надёжного коммита значений в модель GWT.
+  - Сохранены универсальные фоллбэки по текстовым меткам и поиск во фреймах iframes.
 - **2026-09-17 — робастный поиск полей GWT/Iframe и защита от ложного сохранения в Helpdesk:**
   - В `helpdesk_service.py` реализован динамический поиск контекста формы через сканирование `page` и всех `page.frames` с адаптивным ожиданием до 25 секунд (поддержка модальных фреймов Naumen SD).
   - Универсальные локаторы полей `fill_field` и `select_dropdown` переведены на поиск по любому тегу (`label`, `div`, `span`, `td`, `th`), устранив отказ при GWT-разметке (`div.gwt-Label`, `td.gwt-HTML`). Добавлен поиск связанных `input` в строках таблиц `ancestor::tr[1]//input` и родительских блоках.

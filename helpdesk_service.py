@@ -211,8 +211,9 @@ class HelpdeskService:
                             for ctx in contexts:
                                 try:
                                     marker = ctx.locator(
-                                        "xpath=//*[self::label or self::div or self::span or self::td or self::th]"
-                                        "[contains(normalize-space(), 'Местонахождение') or contains(normalize-space(), 'Соглашение') or contains(normalize-space(), 'Услуга')]"
+                                        "#gwt-debug-location-value, #gwt-debug-shortDescr-value, #gwt-debug-servCategory-value, "
+                                        "#gwt-debug-agreementServiceProperty-value, #gwt-debug-subCategory-value, #gwt-debug-apply, "
+                                        "xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), 'Местонахождение') or contains(normalize-space(), 'Соглашение')]"
                                     ).first
                                     if await marker.count() > 0 and await marker.is_visible():
                                         form_ctx = ctx
@@ -227,53 +228,91 @@ class HelpdeskService:
                             logging.warning("Контекст формы не обнаружен по маркерам, используем page")
                             form_ctx = page
 
-                        # 2. Асинхронная функция для выбора значения в выпадающем списке
-                        async def select_dropdown(label: str, text_to_select: str) -> bool:
+                        # 2. Асинхронная функция для выбора значения в выпадающем списке Naumen SD
+                        async def select_dropdown(field_id: str, label_fallback: str, text_to_select: str) -> bool:
                             try:
-                                lbl = form_ctx.locator(
-                                    f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label}')]"
-                                ).first
-                                if await lbl.count() == 0:
-                                    lbl = page.locator(
-                                        f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label}')]"
+                                # Сначала ищем по точному gwt-debug ID
+                                trigger = form_ctx.locator(f"#{field_id}").first
+                                if await trigger.count() == 0:
+                                    trigger = page.locator(f"#{field_id}").first
+
+                                # Фоллбэк: поиск по текстовой метке
+                                if await trigger.count() == 0:
+                                    lbl = form_ctx.locator(
+                                        f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label_fallback}')]"
                                     ).first
                                     if await lbl.count() == 0:
-                                        logging.warning(f"Метка выпадающего списка '{label}' не найдена")
-                                        return False
+                                        lbl = page.locator(
+                                            f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label_fallback}')]"
+                                        ).first
+                                    if await lbl.count() > 0:
+                                        row = lbl.locator("xpath=ancestor::tr[1] | .. | ../..").first
+                                        trigger = row.locator(".formSelect__selected, [id*='-value'], input, select").first
 
-                                row = lbl.locator("xpath=ancestor::tr[1] | .. | ../..").first
+                                if await trigger.count() == 0:
+                                    logging.warning(f"Поле выпадающего списка '{field_id}' ('{label_fallback}') не найдено")
+                                    return False
 
-                                # а) Стандартный HTML <select>
-                                sel = row.locator("select").first
-                                if await sel.count() > 0 and await sel.is_visible():
-                                    try:
-                                        await sel.select_option(label=text_to_select, timeout=3000)
-                                        await page.wait_for_timeout(400)
-                                        return True
-                                    except Exception:
-                                        pass
+                                # Кликаем по триггеру (внешний блок .formSelect__selected или ID)
+                                await trigger.scroll_into_view_if_needed()
+                                await trigger.click(timeout=3000)
+                                await page.wait_for_timeout(400)
 
-                                # б) Кастомный выпадающий список (GWT / Select2 / input)
-                                clickable = row.locator("input, select, .select2-selection, .combo-box, [role='combobox'], .gwt-SuggestBox").first
-                                if await clickable.count() > 0 and await clickable.is_visible():
-                                    await clickable.click(timeout=3000)
+                                # 1. Поиск пункта меню в DOM (точный текст)
+                                opt = None
+                                for target_text in [text_to_select, text_to_select.strip()]:
+                                    for ctx in [form_ctx, page]:
+                                        candidate = ctx.get_by_text(target_text, exact=True).last
+                                        try:
+                                            if await candidate.count() > 0 and await candidate.is_visible():
+                                                opt = candidate
+                                                break
+                                        except Exception:
+                                            pass
+                                    if opt:
+                                        break
+
+                                # 2. Если точный не найден, ищем без учета регистра / частичный
+                                if not opt:
+                                    pattern = re.compile(rf"^\s*{re.escape(text_to_select)}\s*$", re.IGNORECASE)
+                                    for ctx in [form_ctx, page]:
+                                        candidate = ctx.get_by_text(pattern).first
+                                        try:
+                                            if await candidate.count() > 0 and await candidate.is_visible():
+                                                opt = candidate
+                                                break
+                                        except Exception:
+                                            pass
+
+                                if opt:
+                                    await opt.scroll_into_view_if_needed()
+                                    await opt.click(timeout=3000)
                                     await page.wait_for_timeout(400)
+                                    return True
 
-                                    opt = form_ctx.get_by_text(text_to_select, exact=True).last
-                                    if await opt.count() == 0:
-                                        opt = page.get_by_text(text_to_select, exact=True).last
-                                    if await opt.count() > 0:
-                                        await opt.click(timeout=3000)
-                                        await page.wait_for_timeout(400)
-                                        return True
+                                # Фоллбэк: если есть инпут, пробуем ввести значение через press_sequentially для GWT SuggestBox
+                                inp = trigger.locator("input.formSelect, input").first
+                                if await inp.count() > 0 and await inp.is_visible():
+                                    await inp.click()
+                                    await inp.fill("")
+                                    await inp.press_sequentially(text_to_select, delay=40)
+                                    await page.wait_for_timeout(400)
+                                    await inp.press("ArrowDown")
+                                    await page.wait_for_timeout(200)
+                                    await inp.press("Enter")
+                                    await page.wait_for_timeout(400)
+                                    return True
                             except Exception as ex:
-                                logging.warning(f"Не удалось заполнить '{label}': {ex}")
+                                logging.warning(f"Не удалось заполнить '{field_id}' ('{label_fallback}'): {ex}")
                             return False
 
-                        # Заполняем каскадные выпадающие списки:
-                        await select_dropdown("Соглашение/Услуга", "Устройство самообслуживания")
-                        await select_dropdown("Категория услуги", "ATM")
-                        await select_dropdown("Подкатегория", "Статус 13")
+                        # Заполняем каскадные выпадающие списки по точным ID с паузой для AJAX-подгрузки
+                        await select_dropdown("gwt-debug-agreementServiceProperty-value", "Соглашение/Услуга", "Устройство самообслуживания")
+                        await page.wait_for_timeout(800)
+                        await select_dropdown("gwt-debug-servCategory-value", "Категория услуги", "ATM")
+                        await page.wait_for_timeout(800)
+                        await select_dropdown("gwt-debug-subCategory-value", "Подкатегория", "Статус 13")
+                        await page.wait_for_timeout(800)
 
                         try:
                             await page.wait_for_load_state('networkidle', timeout=3000)
@@ -282,36 +321,51 @@ class HelpdeskService:
 
                         formatted_name = HelpdeskService.format_atm_number(host_name)
 
-                        # 3. Функция заполнения текстового поля по названию метки
-                        async def fill_field(label_text: str, value: str) -> bool:
+                        # 3. Функция заполнения текстового поля (по точному ID или метке)
+                        async def fill_field(field_id: str, label_fallback: str, value: str) -> bool:
                             try:
+                                # Поиск по точному gwt-debug ID
+                                container = form_ctx.locator(f"#{field_id}").first
+                                if await container.count() == 0:
+                                    container = page.locator(f"#{field_id}").first
+
+                                if await container.count() > 0:
+                                    target_input = container.locator("input, textarea").first
+                                    if await target_input.count() == 0:
+                                        target_input = container
+                                    await target_input.scroll_into_view_if_needed()
+                                    await target_input.click(timeout=3000)
+                                    await target_input.fill(value)
+                                    await target_input.press("Tab")
+                                    return True
+
+                                # Фоллбэк: поиск по метке
                                 lbl = form_ctx.locator(
-                                    f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label_text}')]"
+                                    f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label_fallback}')]"
                                 ).first
                                 if await lbl.count() == 0:
                                     lbl = page.locator(
-                                        f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label_text}')]"
+                                        f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label_fallback}')]"
                                     ).first
-                                    if await lbl.count() == 0:
-                                        return False
-
-                                candidates = [
-                                    lbl.locator("xpath=ancestor::tr[1]//input[not(@type='hidden')]"),
-                                    lbl.locator("xpath=..//input[not(@type='hidden')]"),
-                                    lbl.locator("xpath=../..//input[not(@type='hidden')]"),
-                                    lbl.locator("xpath=following::input[not(@type='hidden')][1]"),
-                                ]
-                                for cand in candidates:
-                                    if await cand.count() > 0 and await cand.first.is_visible():
-                                        await cand.first.click()
-                                        await cand.first.fill(value)
-                                        return True
+                                if await lbl.count() > 0:
+                                    candidates = [
+                                        lbl.locator("xpath=ancestor::tr[1]//input[not(@type='hidden')]"),
+                                        lbl.locator("xpath=..//input[not(@type='hidden')]"),
+                                        lbl.locator("xpath=../..//input[not(@type='hidden')]"),
+                                        lbl.locator("xpath=following::input[not(@type='hidden')][1]"),
+                                    ]
+                                    for cand in candidates:
+                                        if await cand.count() > 0 and await cand.first.is_visible():
+                                            await cand.first.scroll_into_view_if_needed()
+                                            await cand.first.click()
+                                            await cand.first.fill(value)
+                                            return True
                             except Exception as ex:
-                                logging.warning(f"Ошибка при заполнении поля '{label_text}': {ex}")
+                                logging.warning(f"Ошибка при заполнении поля '{field_id}' ('{label_fallback}'): {ex}")
                             return False
 
-                        loc_ok = await fill_field("Местонахождение", formatted_name)
-                        subj_ok = await fill_field("Тема", f"Лог. номер ATM: {formatted_name}")
+                        loc_ok = await fill_field("gwt-debug-location-value", "Местонахождение", formatted_name)
+                        subj_ok = await fill_field("gwt-debug-shortDescr-value", "Тема", f"Лог. номер ATM: {formatted_name}")
 
                         description = (
                             f"1. Лог. № банкомата: {formatted_name}\n"
@@ -322,17 +376,38 @@ class HelpdeskService:
                         # 4. Заполнение описания
                         desc_ok = False
                         try:
-                            lbl = form_ctx.locator(
-                                "xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), 'Описание')]"
-                            ).first
-                            if await lbl.count() > 0:
-                                row = lbl.locator("xpath=ancestor::tr[1] | .. | ../..").first
-                                area = row.locator("textarea, [contenteditable='true']").first
-                                if await area.count() > 0 and await area.is_visible():
-                                    await area.click()
-                                    await area.fill(description)
-                                    desc_ok = True
+                            # а) Поиск по ID
+                            for desc_id in ["gwt-debug-description-value", "gwt-debug-description", "gwt-debug-descr-value", "gwt-debug-details-value"]:
+                                for ctx in [form_ctx, page]:
+                                    c = ctx.locator(f"#{desc_id}").first
+                                    if await c.count() > 0:
+                                        target = c.locator("textarea, [contenteditable='true']").first
+                                        if await target.count() == 0:
+                                            target = c
+                                        if await target.is_visible():
+                                            await target.scroll_into_view_if_needed()
+                                            await target.click()
+                                            await target.fill(description)
+                                            desc_ok = True
+                                            break
+                                if desc_ok:
+                                    break
 
+                            # б) Поиск по метке
+                            if not desc_ok:
+                                for ctx in [form_ctx, page]:
+                                    lbl = ctx.locator("xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), 'Описание')]").first
+                                    if await lbl.count() > 0:
+                                        row = lbl.locator("xpath=ancestor::tr[1] | .. | ../..").first
+                                        area = row.locator("textarea, [contenteditable='true']").first
+                                        if await area.count() > 0 and await area.is_visible():
+                                            await area.scroll_into_view_if_needed()
+                                            await area.click()
+                                            await area.fill(description)
+                                            desc_ok = True
+                                            break
+
+                            # в) Поиск во фреймах редактора
                             if not desc_ok:
                                 for f in page.frames:
                                     try:
