@@ -141,7 +141,100 @@ class TestSettingsDialogHelpdeskHeadless(unittest.TestCase):
         self.assertTrue(saved_cfg_true.helpdesk_headless)
 
 
+class TestHelpdeskXPathEscape(unittest.TestCase):
+    """Тестирование экранирования XPath (MED-1)."""
+
+    def test_simple_string_single_quotes(self):
+        """Обычная строка без кавычек — оборачивается в одинарные."""
+        result = HelpdeskService._xpath_escape("Местонахождение")
+        self.assertEqual(result, "'Местонахождение'")
+
+    def test_string_with_single_quote_uses_double(self):
+        """Строка с одинарной кавычкой, но без двойных — оборачивается в двойные."""
+        result = HelpdeskService._xpath_escape("it's a test")
+        self.assertEqual(result, '"it\'s a test"')
+
+    def test_string_with_both_quotes_uses_concat(self):
+        """Строка с обоими типами кавычек — используется concat()."""
+        result = HelpdeskService._xpath_escape("it's a \"test\"")
+        self.assertIn("concat(", result)
+
+
+    def test_string_with_double_quote_uses_single(self):
+        """Строка с двойными кавычками, но без одинарных — одинарные обёртки."""
+        result = HelpdeskService._xpath_escape('say "hello"')
+        self.assertEqual(result, "'say \"hello\"'")
+
+    def test_empty_string(self):
+        """Пустая строка."""
+        result = HelpdeskService._xpath_escape("")
+        self.assertEqual(result, "''")
+
+
+class TestHelpdeskFormMethodsMock(unittest.IsolatedAsyncioTestCase):
+    """Тестирование методов заполнения формы с mock Playwright (INFO-1)."""
+
+    def _make_locator(self, count=1, visible=True):
+        """Создаёт mock Locator с нужным поведением."""
+        from unittest.mock import AsyncMock, MagicMock, PropertyMock
+        loc = AsyncMock()
+        loc.count = AsyncMock(return_value=count)
+        loc.is_visible = AsyncMock(return_value=visible)
+        loc.first = loc
+        loc.last = loc
+        loc.scroll_into_view_if_needed = AsyncMock()
+        loc.click = AsyncMock()
+        loc.fill = AsyncMock()
+        loc.press = AsyncMock()
+        loc.press_sequentially = AsyncMock()
+        loc.get_attribute = AsyncMock(return_value=None)
+        loc.wait_for = AsyncMock()
+        loc.locator = MagicMock(return_value=loc)
+        loc.get_by_text = MagicMock(return_value=loc)
+        return loc
+
+    def _make_page(self, locator_count=1, visible=True):
+        from unittest.mock import AsyncMock, MagicMock
+        loc = self._make_locator(count=locator_count, visible=visible)
+        page = MagicMock()
+        page.locator = MagicMock(return_value=loc)
+        page.get_by_text = MagicMock(return_value=loc)
+        page.wait_for_timeout = AsyncMock()
+        page.frames = []
+        return page, loc
+
+    async def test_fill_field_by_gwt_id_success(self):
+        """Заполнение поля по gwt-debug ID — возвращает True."""
+        page, loc = self._make_page(locator_count=1, visible=True)
+        result = await HelpdeskService._fill_field(page, page, "gwt-debug-location-value", "Местонахождение", "00001234")
+        self.assertTrue(result)
+        loc.fill.assert_called()
+
+    async def test_fill_field_not_found_returns_false(self):
+        """Поле не найдено ни по ID, ни по метке — возвращает False."""
+        page, loc = self._make_page(locator_count=0, visible=False)
+        result = await HelpdeskService._fill_field(page, page, "nonexistent-id", "НесуществующееПоле", "value")
+        self.assertFalse(result)
+
+    async def test_select_dropdown_trigger_found_and_option_clicked(self):
+        """Dropdown триггер найден, опция найдена и кликнута."""
+        page, loc = self._make_page(locator_count=1, visible=True)
+        result = await HelpdeskService._select_dropdown(page, page, "gwt-debug-servCategory-value", "Категория услуги", "ATM")
+        self.assertTrue(result)
+
+    async def test_select_dropdown_trigger_not_found(self):
+        """Dropdown триггер не найден — возвращает False."""
+        page, loc = self._make_page(locator_count=0, visible=False)
+        result = await HelpdeskService._select_dropdown(page, page, "nonexistent", "Нет", "Нет")
+        self.assertFalse(result)
+
+    async def test_fill_description_by_id(self):
+        """Заполнение описания по gwt-debug ID."""
+        page, loc = self._make_page(locator_count=1, visible=True)
+        result = await HelpdeskService._fill_description(page, page, "Тестовое описание")
+        self.assertTrue(result)
+        loc.fill.assert_called_with("Тестовое описание")
+
+
 if __name__ == '__main__':
     unittest.main()
-
-
