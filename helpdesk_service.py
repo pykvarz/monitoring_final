@@ -24,7 +24,7 @@ class HelpdeskService:
     SAVE_BUTTON_SELECTOR = (
         "#gwt-debug-apply, #gwt-debug-buttons .g-button, [id*='debug-apply'], "
         "div.g-button:has-text('Сохранить'), button:has-text('Сохранить'), "
-        "[role='button']:has-text('Сохранить'), input[type='submit']"
+        "[role='button']:has-text('Сохранить'), .g-button:has-text('Сохранить')"
     )
 
     @classmethod
@@ -198,110 +198,189 @@ class HelpdeskService:
                     
                     try:
                         # Переход на страницу добавления заявки с явным таймаутом
-                        await page.goto(url, timeout=15000)
-                        await page.wait_for_load_state('networkidle', timeout=15000)
-                        
-                        # Ожидание отрисовки контейнера формы Naumen SD (GWT)
+                        await page.goto(url, timeout=20000)
                         try:
-                            form_container = page.locator("#gwt-debug-buttons, #gwt-debug-apply, .formActions, xpath=//label[contains(text(), 'Местонахождение')]").first
-                            await form_container.wait_for(state="visible", timeout=15000)
+                            await page.wait_for_load_state('networkidle', timeout=10000)
                         except Exception:
-                            logging.warning("Ожидание контейнера формы превысило таймаут, продолжаем попытку заполнения")
+                            pass
 
-                        
-                        # Асинхронная функция для выбора значения в выпадающем списке
-                        async def select_dropdown(label: str, text_to_select: str):
+                        # 1. Поиск контекста формы (в основном окне или во встроенных iframes)
+                        form_ctx = None
+                        for _ in range(50):  # До 25 секунд с шагом 500мс
+                            contexts = [page] + list(page.frames)
+                            for ctx in contexts:
+                                try:
+                                    marker = ctx.locator(
+                                        "xpath=//*[self::label or self::div or self::span or self::td or self::th]"
+                                        "[contains(normalize-space(), 'Местонахождение') or contains(normalize-space(), 'Соглашение') or contains(normalize-space(), 'Услуга')]"
+                                    ).first
+                                    if await marker.count() > 0 and await marker.is_visible():
+                                        form_ctx = ctx
+                                        break
+                                except Exception:
+                                    continue
+                            if form_ctx:
+                                break
+                            await page.wait_for_timeout(500)
+
+                        if not form_ctx:
+                            logging.warning("Контекст формы не обнаружен по маркерам, используем page")
+                            form_ctx = page
+
+                        # 2. Асинхронная функция для выбора значения в выпадающем списке
+                        async def select_dropdown(label: str, text_to_select: str) -> bool:
                             try:
-                                label_el = page.locator(f"xpath=//label[contains(text(), '{label}')]")
-                                if await label_el.count() > 0:
-                                    parent = label_el.locator("..")
+                                lbl = form_ctx.locator(
+                                    f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label}')]"
+                                ).first
+                                if await lbl.count() == 0:
+                                    lbl = page.locator(
+                                        f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label}')]"
+                                    ).first
+                                    if await lbl.count() == 0:
+                                        logging.warning(f"Метка выпадающего списка '{label}' не найдена")
+                                        return False
 
-                                    # 1. Проверяем стандартный HTML <select>
-                                    select_el = parent.locator("select")
-                                    if await select_el.count() > 0 and await select_el.first.is_visible():
-                                        try:
-                                            await select_el.first.select_option(label=text_to_select, timeout=3000)
-                                            await page.wait_for_timeout(400)
-                                            return
-                                        except Exception:
-                                            pass
+                                row = lbl.locator("xpath=ancestor::tr[1] | .. | ../..").first
 
-                                    # 2. Для кастомных выпадающих списков (Select2, комбобоксы)
-                                    input_el = parent.locator("input, select, .select2-selection, .combo-box, [role='combobox']").first
-                                    await input_el.click(timeout=3000)
-                                    await page.wait_for_timeout(300)
-                                    option = page.get_by_text(text_to_select, exact=True).last
-                                    await option.click(timeout=3000)
+                                # а) Стандартный HTML <select>
+                                sel = row.locator("select").first
+                                if await sel.count() > 0 and await sel.is_visible():
+                                    try:
+                                        await sel.select_option(label=text_to_select, timeout=3000)
+                                        await page.wait_for_timeout(400)
+                                        return True
+                                    except Exception:
+                                        pass
+
+                                # б) Кастомный выпадающий список (GWT / Select2 / input)
+                                clickable = row.locator("input, select, .select2-selection, .combo-box, [role='combobox'], .gwt-SuggestBox").first
+                                if await clickable.count() > 0 and await clickable.is_visible():
+                                    await clickable.click(timeout=3000)
                                     await page.wait_for_timeout(400)
+
+                                    opt = form_ctx.get_by_text(text_to_select, exact=True).last
+                                    if await opt.count() == 0:
+                                        opt = page.get_by_text(text_to_select, exact=True).last
+                                    if await opt.count() > 0:
+                                        await opt.click(timeout=3000)
+                                        await page.wait_for_timeout(400)
+                                        return True
                             except Exception as ex:
                                 logging.warning(f"Не удалось заполнить '{label}': {ex}")
+                            return False
 
                         # Заполняем каскадные выпадающие списки:
-                        # - "Тип заявки" не трогаем (автоматически заполнен при открытии ссылки)
                         await select_dropdown("Соглашение/Услуга", "Устройство самообслуживания")
                         await select_dropdown("Категория услуги", "ATM")
                         await select_dropdown("Подкатегория", "Статус 13")
 
-                        # - "Шаблон" и "Режим работы" автоматически заполняются веб-формой при выборе "Подкатегория".
-                        # Даем странице время отработать встроенные AJAX-скрипты автозаполнения:
                         try:
                             await page.wait_for_load_state('networkidle', timeout=3000)
                         except Exception:
                             await page.wait_for_timeout(1000)
-                        
-                        # Форматируем номер банкомата с добавлением префикса 0000
+
                         formatted_name = HelpdeskService.format_atm_number(host_name)
 
-                        # Текстовые поля
-                        try:
-                            loc_box = page.locator("xpath=//label[contains(text(), 'Местонахождение')]/..//input")
-                            if await loc_box.count() > 0:
-                                await loc_box.first.fill(formatted_name)
-                        except Exception:
-                            pass
+                        # 3. Функция заполнения текстового поля по названию метки
+                        async def fill_field(label_text: str, value: str) -> bool:
+                            try:
+                                lbl = form_ctx.locator(
+                                    f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label_text}')]"
+                                ).first
+                                if await lbl.count() == 0:
+                                    lbl = page.locator(
+                                        f"xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), '{label_text}')]"
+                                    ).first
+                                    if await lbl.count() == 0:
+                                        return False
 
-                        try:
-                            subj_box = page.locator("xpath=//label[contains(text(), 'Тема')]/..//input")
-                            if await subj_box.count() > 0:
-                                await subj_box.first.fill(f"Лог. номер ATM: {formatted_name}")
-                        except Exception:
-                            pass
-                        
+                                candidates = [
+                                    lbl.locator("xpath=ancestor::tr[1]//input[not(@type='hidden')]"),
+                                    lbl.locator("xpath=..//input[not(@type='hidden')]"),
+                                    lbl.locator("xpath=../..//input[not(@type='hidden')]"),
+                                    lbl.locator("xpath=following::input[not(@type='hidden')][1]"),
+                                ]
+                                for cand in candidates:
+                                    if await cand.count() > 0 and await cand.first.is_visible():
+                                        await cand.first.click()
+                                        await cand.first.fill(value)
+                                        return True
+                            except Exception as ex:
+                                logging.warning(f"Ошибка при заполнении поля '{label_text}': {ex}")
+                            return False
+
+                        loc_ok = await fill_field("Местонахождение", formatted_name)
+                        subj_ok = await fill_field("Тема", f"Лог. номер ATM: {formatted_name}")
+
                         description = (
                             f"1. Лог. № банкомата: {formatted_name}\n"
                             f"2. Статус: Установить/Снять: {status_action}\n"
                             f"3. Причина: {reason}"
                         )
+
+                        # 4. Заполнение описания
+                        desc_ok = False
                         try:
-                            desc_box = page.locator("xpath=//label[contains(text(), 'Описание')]/..//*[self::textarea or @contenteditable='true']")
-                            if await desc_box.count() > 0:
-                                await desc_box.first.fill(description)
-                            else:
-                                frames = page.frames
-                                for f in frames:
-                                    body = f.locator("body")
-                                    if await body.count() > 0 and await body.get_attribute("contenteditable") == "true":
-                                        await body.fill(description)
-                                        break
+                            lbl = form_ctx.locator(
+                                "xpath=//*[self::label or self::div or self::span or self::td or self::th][contains(normalize-space(), 'Описание')]"
+                            ).first
+                            if await lbl.count() > 0:
+                                row = lbl.locator("xpath=ancestor::tr[1] | .. | ../..").first
+                                area = row.locator("textarea, [contenteditable='true']").first
+                                if await area.count() > 0 and await area.is_visible():
+                                    await area.click()
+                                    await area.fill(description)
+                                    desc_ok = True
+
+                            if not desc_ok:
+                                for f in page.frames:
+                                    try:
+                                        body = f.locator("body[contenteditable='true'], body.cke_editable, body").first
+                                        if await body.count() > 0 and await body.get_attribute("contenteditable") == "true":
+                                            await body.fill(description)
+                                            desc_ok = True
+                                            break
+                                    except Exception:
+                                        continue
                         except Exception as ex:
                             logging.warning(f"Не удалось заполнить 'Описание': {ex}")
 
-                        # Нажимаем кнопку Сохранить (GWT Naumen SD: #gwt-debug-apply)
-                        try:
-                            save_btn = page.locator(HelpdeskService.SAVE_BUTTON_SELECTOR).first
-                            await save_btn.wait_for(state="visible", timeout=15000)
-                            await save_btn.click(timeout=5000)
-                            await page.wait_for_load_state('networkidle', timeout=15000)
-                            # Пауза 2 секунды в видимом режиме, чтобы пользователь успел увидеть результат
-                            if not headless:
-                                await page.wait_for_timeout(2000)
-
-                            logging.info(f"Заявка ({status_action}) для {host_name} успешно создана.")
-                            HelpdeskService.signals.ticket_created.emit(host_name, status_action)
-                        except Exception as ex:
-                            logging.error(f"Ошибка при сохранении заявки: {ex}")
+                        # 5. СТРОГАЯ ВАЛИДАЦИЯ: нельзя сохранять пустую заявку!
+                        if not loc_ok and not subj_ok:
                             await cls._capture_error_screenshot(page, host_name)
-                            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Ошибка кнопки 'Сохранить': {ex}")
+                            err_msg = f"Поля заявки ('Местонахождение', 'Тема') не найдены на форме для {host_name}"
+                            logging.error(err_msg)
+                            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, err_msg)
+                            return
+
+                        # 6. Поиск и нажатие кнопки Сохранить
+                        save_btn = None
+                        for ctx in [form_ctx, page]:
+                            btn = ctx.locator(HelpdeskService.SAVE_BUTTON_SELECTOR).first
+                            if await btn.count() > 0 and await btn.is_visible():
+                                save_btn = btn
+                                break
+
+                        if not save_btn:
+                            await cls._capture_error_screenshot(page, host_name)
+                            err_msg = "Кнопка 'Сохранить' не найдена на форме заявки"
+                            logging.error(err_msg)
+                            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, err_msg)
+                            return
+
+                        await save_btn.click(timeout=5000)
+                        try:
+                            await page.wait_for_load_state('networkidle', timeout=10000)
+                        except Exception:
+                            pass
+
+                        # Пауза 3 секунды в видимом режиме, чтобы оператор увидел результат
+                        if not headless:
+                            await page.wait_for_timeout(3000)
+
+                        logging.info(f"Заявка ({status_action}) для {host_name} успешно заполнена и создана.")
+                        HelpdeskService.signals.ticket_created.emit(host_name, status_action)
 
                     except PlaywrightTimeoutError as e:
                         logging.error(f"Таймаут Playwright при обработке {host_name} ({url})")
