@@ -77,6 +77,42 @@ class TestHelpdeskServiceUrlAndSelectors(unittest.TestCase):
         self.assertIn("helpdesk_error_ATM-01___test.png", path)
 
 
+class TestHelpdeskLaunchArgs(unittest.TestCase):
+    """Тестирование формирования аргументов браузера для Windows SSO / NTLM / Kerberos."""
+
+    def test_launch_args_no_quotes_and_contains_auth_flags(self):
+        """Проверка отсутствия кавычек в флагах авторизации и наличия NTLM/Kerberos параметров."""
+        args = HelpdeskService.get_launch_args("https://helpdesk.eub.kz/sd/operator/#add:serviceCall$request")
+
+        # 1. Ни в одном аргументе не должно быть двойных кавычек
+        for arg in args:
+            self.assertNotIn('"', arg, f"Аргумент содержит двойные кавычки: {arg}")
+
+        # 2. Должен быть правильный auth-server-allowlist без кавычек
+        self.assertIn("--auth-server-allowlist=*helpdesk.eub.kz*", args)
+
+        # 3. Должно быть делегирование Kerberos
+        self.assertIn("--auth-negotiate-delegate-allowlist=*helpdesk.eub.kz*", args)
+
+        # 4. Должны быть схемы авторизации
+        self.assertIn("--auth-schemes=basic,digest,ntlm,negotiate", args)
+
+        # 5. Скрытие автоматизации
+        self.assertIn("--disable-blink-features=AutomationControlled", args)
+
+    def test_launch_args_handles_ports_and_paths(self):
+        """Проверка извлечения чистого домена при наличии порта."""
+        args = HelpdeskService.get_launch_args("http://hd.company.local:8080/sd/")
+        self.assertIn("--auth-server-allowlist=*hd.company.local*", args)
+        self.assertIn("--auth-negotiate-delegate-allowlist=*hd.company.local*", args)
+
+    def test_launch_args_fallback_on_empty_url(self):
+        """Проверка формирования аргументов при пустом или некорректном URL."""
+        args = HelpdeskService.get_launch_args("")
+        self.assertIn("--auth-schemes=basic,digest,ntlm,negotiate", args)
+        self.assertIn("--disable-blink-features=AutomationControlled", args)
+
+
 
 class TestSettingsDialogHelpdeskHeadless(unittest.TestCase):
     """Тестирование переключателя headless в SettingsDialog."""

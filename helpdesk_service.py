@@ -148,6 +148,26 @@ class HelpdeskService:
             return name
         return f"0000{name}"
 
+    @staticmethod
+    def get_launch_args(url: str) -> list:
+        """
+        Формирует аргументы запуска браузера с поддержкой Windows SSO / NTLM / Kerberos.
+        Исключает кавычки в значениях флагов, блокирующие распознавание домена Chromium.
+        """
+        args = [
+            '--auth-schemes=basic,digest,ntlm,negotiate',
+            '--disable-blink-features=AutomationControlled',
+        ]
+        if url:
+            domain = urllib.parse.urlparse(url).netloc
+            if ":" in domain:
+                domain = domain.split(":")[0]
+            domain = domain.strip()
+            if domain:
+                args.insert(0, f'--auth-server-allowlist=*{domain}*')
+                args.insert(1, f'--auth-negotiate-delegate-allowlist=*{domain}*')
+        return args
+
     @classmethod
     async def _process_ticket_task_async(cls, url: str, host_name: str, status_action: str, reason: str = "без связи", headless: bool = False):
         async with cls._get_semaphore():
@@ -159,15 +179,7 @@ class HelpdeskService:
                 url = HelpdeskService.normalize_url(url)
                 async with async_playwright() as p:
                     logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}, headless: {headless}")
-                    domain = urllib.parse.urlparse(url).netloc
-                    if ":" in domain:
-                        domain = domain.split(":")[0]
-                    
-                    # Запуск браузера: системный Microsoft Edge (по умолчанию на Windows), затем Chrome / встроенный Chromium
-                    launch_args = [
-                        f'--auth-server-allowlist="{domain}"',
-                        '--disable-blink-features=AutomationControlled',
-                    ]
+                    launch_args = cls.get_launch_args(url)
                     for channel in ["msedge", "chrome", None]:
                         try:
                             kwargs = {"headless": headless, "args": launch_args}
