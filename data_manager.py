@@ -465,9 +465,9 @@ class DataManager(QObject):
         # Эмитим сигнал (уже без лока)
         self.hosts_updated.emit(updates)
 
-    def get_hosts_by_ids(self, host_ids: List[str]) -> List[Host]:
+    def get_hosts_by_ids(self, host_ids: List[str], connection_name: str = None) -> List[Host]:
         """Получение списка хостов по ID"""
-        db = self.db_manager.get_db()
+        db = QSqlDatabase.database(connection_name) if connection_name else self.db_manager.get_db()
         if not host_ids or not db.isOpen():
             return []
             

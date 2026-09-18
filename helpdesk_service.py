@@ -19,6 +19,12 @@ class HelpdeskService:
     _thread = None
     _lock = threading.Lock()
     _semaphore = None
+    _background_tasks = set()
+    _active_browser_holders = []
+    _active_wrapper_tasks = set()
+    _acquired_wrapper_tasks = set()
+    _shutting_down = False
+    TICKET_TIMEOUT_SECONDS = 60.0
     signals = HelpdeskSignals()
 
     SAVE_BUTTON_SELECTOR = (
@@ -33,6 +39,52 @@ class HelpdeskService:
         if cls._semaphore is None:
             cls._semaphore = asyncio.Semaphore(1)
         return cls._semaphore
+
+    @classmethod
+    def _track_background_task(cls, task):
+        cls._background_tasks.add(task)
+        task.add_done_callback(cls._background_tasks.discard)
+
+    @classmethod
+    async def _cleanup_browser_resources(cls, browser_holder):
+        cleanup_tasks = []
+        browser = browser_holder.get("browser")
+        playwright = browser_holder.get("playwright")
+        if browser:
+            cleanup_tasks.append(asyncio.create_task(browser.close()))
+        if playwright:
+            cleanup_tasks.append(asyncio.create_task(playwright.stop()))
+        if not cleanup_tasks:
+            return
+        results = await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                logging.warning(f"Ошибка очистки ресурсов Helpdesk: {result}")
+
+    @classmethod
+    async def _release_after_lifecycle(cls, tasks, semaphore, browser_holder):
+        await asyncio.gather(*tasks, return_exceptions=True)
+        semaphore.release()
+        if browser_holder in cls._active_browser_holders:
+            cls._active_browser_holders.remove(browser_holder)
+
+    @classmethod
+    async def _graceful_shutdown(cls):
+        queued_tasks = cls._active_wrapper_tasks - cls._acquired_wrapper_tasks
+        for task in queued_tasks:
+            task.cancel()
+        if queued_tasks:
+            await asyncio.gather(*queued_tasks, return_exceptions=True)
+
+        cleanup_tasks = [
+            asyncio.create_task(cls._cleanup_browser_resources(holder))
+            for holder in list(cls._active_browser_holders)
+        ]
+        pending = set(cls._active_wrapper_tasks) | set(cls._background_tasks)
+        pending.update(cleanup_tasks)
+        pending.discard(asyncio.current_task())
+        if pending:
+            await asyncio.wait(pending, timeout=5.0)
 
     @staticmethod
     def _get_error_screenshot_path(host_name: str) -> str:
@@ -60,6 +112,7 @@ class HelpdeskService:
             if cls._thread and cls._thread.is_alive():
                 return
                 
+            cls._shutting_down = False
             cls._loop = asyncio.new_event_loop()
             cls._semaphore = asyncio.Semaphore(1)
             
@@ -87,6 +140,14 @@ class HelpdeskService:
         """Остановка фонового потока и цикла событий"""
         try:
             if cls._loop and cls._loop.is_running():
+                cls._shutting_down = True
+                cleanup_future = asyncio.run_coroutine_threadsafe(
+                    cls._graceful_shutdown(), cls._loop
+                )
+                try:
+                    cleanup_future.result(timeout=6.0)
+                except Exception as e:
+                    logging.warning(f"Helpdesk: graceful shutdown не завершён: {e}")
                 cls._loop.call_soon_threadsafe(cls._loop.stop)
             if cls._thread and cls._thread.is_alive():
                 cls._thread.join(timeout=2.0)
@@ -376,144 +437,255 @@ class HelpdeskService:
             logging.warning(f"Не удалось заполнить 'Описание': {ex}")
         return False
 
+    @staticmethod
+    async def _wait_for_form_closed(form_ctx) -> bool:
+        """Ожидает закрытия формы; удалённый iframe также считается закрытой формой."""
+        try:
+            marker = form_ctx.locator(
+                "#gwt-debug-location-value, #gwt-debug-shortDescr-value"
+            ).first
+            await marker.wait_for(state="hidden", timeout=5000)
+            return True
+        except Exception:
+            is_detached = getattr(form_ctx, "is_detached", None)
+            if callable(is_detached):
+                try:
+                    return bool(is_detached())
+                except Exception:
+                    pass
+            return False
+
     # ==================== Основной процесс ====================
 
     @classmethod
     async def _process_ticket_task_async(cls, url: str, host_name: str, status_action: str, reason: str = "без связи", headless: bool = False):
-        async with cls._get_semaphore():
-            page = None
-            browser = None
-            try:
-                from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-                
-                url = HelpdeskService.normalize_url(url)
-                async with async_playwright() as p:
-                    logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}, headless: {headless}")
-                    launch_args = cls.get_launch_args(url)
-                    for channel in ["msedge", "chrome", None]:
-                        try:
-                            kwargs = {"headless": headless, "args": launch_args}
-                            if channel:
-                                kwargs["channel"] = channel
-                            browser = await p.chromium.launch(**kwargs)
-                            break
-                        except Exception:
-                            continue
+        semaphore = cls._get_semaphore()
+        wrapper_task = asyncio.current_task()
+        cls._active_wrapper_tasks.add(wrapper_task)
+        acquired = False
+        release_in_finally = True
+        browser_holder = {}
+        session_task = None
+        cleanup_task = None
+        try:
+            await semaphore.acquire()
+            acquired = True
+            cls._acquired_wrapper_tasks.add(wrapper_task)
+            if cls._shutting_down:
+                return None
 
-                    if not browser:
-                        raise RuntimeError("Не удалось запустить браузер (Microsoft Edge или Chrome не найдены в системе)")
+            cls._active_browser_holders.append(browser_holder)
+            session_task = asyncio.create_task(
+                cls._process_ticket_session_async(
+                    url,
+                    host_name,
+                    status_action,
+                    reason,
+                    headless=headless,
+                    browser_holder=browser_holder,
+                )
+            )
+            done, _ = await asyncio.wait(
+                {session_task}, timeout=cls.TICKET_TIMEOUT_SECONDS
+            )
+            if not done and not browser_holder.get("terminal_emitted"):
+                browser_holder["terminal_emitted"] = True
+                cls.signals.ticket_failed.emit(
+                    host_name,
+                    status_action,
+                    f"Глобальный таймаут: превышено {cls.TICKET_TIMEOUT_SECONDS:g} с",
+                )
 
-                    context = await browser.new_context()
-                    page = await context.new_page()
-                    
-                    try:
-                        await page.goto(url, timeout=20000)
-                        try:
-                            await page.wait_for_load_state('networkidle', timeout=10000)
-                        except Exception:
-                            pass
+            cleanup_task = asyncio.create_task(
+                cls._cleanup_browser_resources(browser_holder)
+            )
+            lifecycle_tasks = {session_task, cleanup_task}
+            finished, pending = await asyncio.wait(lifecycle_tasks, timeout=5.0)
+            for task in finished:
+                try:
+                    task.result()
+                except Exception as e:
+                    logging.warning(f"Ошибка завершения Helpdesk для {host_name}: {e}")
 
-                        # 1. Поиск контекста формы
-                        form_ctx = await cls._find_form_context(page)
-
-                        # 2. Каскадные выпадающие списки
-                        await cls._select_dropdown(page, form_ctx, "gwt-debug-agreementServiceProperty-value", "Соглашение/Услуга", "Устройство самообслуживания")
-                        await page.wait_for_timeout(800)
-                        await cls._select_dropdown(page, form_ctx, "gwt-debug-servCategory-value", "Категория услуги", "ATM")
-                        await page.wait_for_timeout(800)
-                        await cls._select_dropdown(page, form_ctx, "gwt-debug-subCategory-value", "Подкатегория", "Статус 13")
-                        await page.wait_for_timeout(800)
-
-                        try:
-                            await page.wait_for_load_state('networkidle', timeout=3000)
-                        except Exception:
-                            await page.wait_for_timeout(1000)
-
-                        # 3. Текстовые поля
-                        formatted_name = HelpdeskService.format_atm_number(host_name)
-                        loc_ok = await cls._fill_field(page, form_ctx, "gwt-debug-location-value", "Местонахождение", formatted_name)
-                        subj_ok = await cls._fill_field(page, form_ctx, "gwt-debug-shortDescr-value", "Тема", f"Лог. номер ATM: {formatted_name}")
-
-                        description = (
-                            f"1. Лог. № банкомата: {formatted_name}\n"
-                            f"2. Статус: Установить/Снять: {status_action}\n"
-                            f"3. Причина: {reason}"
+            if pending:
+                release_in_finally = False
+                cls._track_background_task(
+                    asyncio.create_task(
+                        cls._release_after_lifecycle(
+                            pending, semaphore, browser_holder
                         )
-                        await cls._fill_description(page, form_ctx, description)
+                    )
+                )
+            return None
+        except asyncio.CancelledError:
+            if not acquired or session_task is None:
+                raise
+            if cleanup_task is None:
+                cleanup_task = asyncio.create_task(
+                    cls._cleanup_browser_resources(browser_holder)
+                )
+            pending = {
+                task for task in (session_task, cleanup_task) if not task.done()
+            }
+            if pending:
+                release_in_finally = False
+                cls._track_background_task(
+                    asyncio.create_task(
+                        cls._release_after_lifecycle(
+                            pending, semaphore, browser_holder
+                        )
+                    )
+                )
+            raise
+        finally:
+            cls._active_wrapper_tasks.discard(wrapper_task)
+            cls._acquired_wrapper_tasks.discard(wrapper_task)
+            if acquired and release_in_finally:
+                semaphore.release()
+                if browser_holder in cls._active_browser_holders:
+                    cls._active_browser_holders.remove(browser_holder)
 
-                        # 4. СТРОГАЯ ВАЛИДАЦИЯ: блокировка при незаполнении любого обязательного поля
-                        if not loc_ok or not subj_ok:
-                            await cls._capture_error_screenshot(page, host_name)
-                            missing = []
-                            if not loc_ok:
-                                missing.append("Местонахождение")
-                            if not subj_ok:
-                                missing.append("Тема")
-                            err_msg = f"Поля заявки ({', '.join(missing)}) не заполнены на форме для {host_name}"
-                            logging.error(err_msg)
-                            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, err_msg)
-                            return
+    @classmethod
+    async def _process_ticket_session_async(
+        cls,
+        url: str,
+        host_name: str,
+        status_action: str,
+        reason: str = "без связи",
+        headless: bool = False,
+        browser_holder=None,
+    ):
+        page = None
+        browser = None
+        terminal_state = browser_holder if browser_holder is not None else {}
 
-                        # 5. Кнопка Сохранить
-                        save_btn = None
-                        for search_ctx in [form_ctx, page]:
-                            btn = search_ctx.locator(HelpdeskService.SAVE_BUTTON_SELECTOR).first
-                            if await btn.count() > 0 and await btn.is_visible():
-                                save_btn = btn
-                                break
+        def emit_failed(message):
+            if terminal_state.get("terminal_emitted"):
+                return
+            terminal_state["terminal_emitted"] = True
+            HelpdeskService.signals.ticket_failed.emit(
+                host_name, status_action, message
+            )
 
-                        if not save_btn:
-                            await cls._capture_error_screenshot(page, host_name)
-                            err_msg = "Кнопка 'Сохранить' не найдена на форме заявки"
-                            logging.error(err_msg)
-                            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, err_msg)
-                            return
+        def emit_created():
+            if terminal_state.get("terminal_emitted"):
+                return
+            terminal_state["terminal_emitted"] = True
+            HelpdeskService.signals.ticket_created.emit(host_name, status_action)
 
-                        await save_btn.click(timeout=5000)
-                        try:
-                            await page.wait_for_load_state('networkidle', timeout=10000)
-                        except Exception:
-                            pass
+        try:
+            from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 
-                        # 6. Пост-сохранительная верификация: форма должна исчезнуть (проверяем в контексте формы)
-                        target_ctx = form_ctx if form_ctx else page
-                        form_still_visible = False
-                        try:
-                            marker = target_ctx.locator("#gwt-debug-location-value, #gwt-debug-shortDescr-value").first
-                            await marker.wait_for(state="hidden", timeout=5000)
-                        except Exception:
-                            form_still_visible = True
+            url = HelpdeskService.normalize_url(url)
+            p = await async_playwright().start()
+            terminal_state["playwright"] = p
+            logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}, headless: {headless}")
+            launch_args = cls.get_launch_args(url)
+            for channel in ["msedge", "chrome", None]:
+                try:
+                    kwargs = {"headless": headless, "args": launch_args}
+                    if channel:
+                        kwargs["channel"] = channel
+                    browser = await p.chromium.launch(**kwargs)
+                    break
+                except Exception:
+                    continue
 
-                        if form_still_visible:
-                            await cls._capture_error_screenshot(page, host_name)
-                            err_msg = f"Форма заявки не закрылась после сохранения для {host_name} (возможно, ошибка валидации на сервере)"
-                            logging.error(err_msg)
-                            HelpdeskService.signals.ticket_failed.emit(host_name, status_action, err_msg)
-                            return
+            if not browser:
+                raise RuntimeError("Не удалось запустить браузер (Microsoft Edge или Chrome не найдены в системе)")
+            if browser_holder is not None:
+                browser_holder["browser"] = browser
 
-                        # Пауза в видимом режиме для визуального контроля
-                        if not headless:
-                            await page.wait_for_timeout(3000)
+            context = await browser.new_context()
+            page = await context.new_page()
 
-                        logging.info(f"Заявка ({status_action}) для {host_name} успешно заполнена и создана.")
-                        HelpdeskService.signals.ticket_created.emit(host_name, status_action)
+            try:
+                await page.goto(url, timeout=20000)
+                try:
+                    await page.wait_for_load_state('networkidle', timeout=10000)
+                except Exception:
+                    pass
 
-                    except PlaywrightTimeoutError as e:
-                        logging.error(f"Таймаут Playwright при обработке {host_name} ({url}): {e}")
-                        await cls._capture_error_screenshot(page, host_name)
-                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Таймаут страницы: {e}")
-                    except asyncio.TimeoutError as e:
-                        logging.error(f"Глобальный таймаут при обработке {host_name} ({url}): {e}")
-                        await cls._capture_error_screenshot(page, host_name)
-                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Глобальный таймаут: {e}")
-                    except Exception as e:
-                        logging.error(f"Ошибка в процессе заполнения заявки для {host_name}: {e}")
-                        await cls._capture_error_screenshot(page, host_name)
-                        HelpdeskService.signals.ticket_failed.emit(host_name, status_action, str(e))
-                    finally:
-                        if browser:
-                            await browser.close()
-                            
+                form_ctx = await cls._find_form_context(page)
+
+                await cls._select_dropdown(page, form_ctx, "gwt-debug-agreementServiceProperty-value", "Соглашение/Услуга", "Устройство самообслуживания")
+                await page.wait_for_timeout(800)
+                await cls._select_dropdown(page, form_ctx, "gwt-debug-servCategory-value", "Категория услуги", "ATM")
+                await page.wait_for_timeout(800)
+                await cls._select_dropdown(page, form_ctx, "gwt-debug-subCategory-value", "Подкатегория", "Статус 13")
+                await page.wait_for_timeout(800)
+
+                try:
+                    await page.wait_for_load_state('networkidle', timeout=3000)
+                except Exception:
+                    await page.wait_for_timeout(1000)
+
+                formatted_name = HelpdeskService.format_atm_number(host_name)
+                loc_ok = await cls._fill_field(page, form_ctx, "gwt-debug-location-value", "Местонахождение", formatted_name)
+                subj_ok = await cls._fill_field(page, form_ctx, "gwt-debug-shortDescr-value", "Тема", f"Лог. номер ATM: {formatted_name}")
+
+                description = (
+                    f"1. Лог. № банкомата: {formatted_name}\n"
+                    f"2. Статус: Установить/Снять: {status_action}\n"
+                    f"3. Причина: {reason}"
+                )
+                await cls._fill_description(page, form_ctx, description)
+
+                if not loc_ok or not subj_ok:
+                    await cls._capture_error_screenshot(page, host_name)
+                    missing = []
+                    if not loc_ok:
+                        missing.append("Местонахождение")
+                    if not subj_ok:
+                        missing.append("Тема")
+                    err_msg = f"Поля заявки ({', '.join(missing)}) не заполнены на форме для {host_name}"
+                    logging.error(err_msg)
+                    emit_failed(err_msg)
+                    return
+
+                save_btn = None
+                for search_ctx in [form_ctx, page]:
+                    btn = search_ctx.locator(HelpdeskService.SAVE_BUTTON_SELECTOR).first
+                    if await btn.count() > 0 and await btn.is_visible():
+                        save_btn = btn
+                        break
+
+                if not save_btn:
+                    await cls._capture_error_screenshot(page, host_name)
+                    err_msg = "Кнопка 'Сохранить' не найдена на форме заявки"
+                    logging.error(err_msg)
+                    emit_failed(err_msg)
+                    return
+
+                await save_btn.click(timeout=5000)
+                try:
+                    await page.wait_for_load_state('networkidle', timeout=10000)
+                except Exception:
+                    pass
+
+                target_ctx = form_ctx if form_ctx else page
+                if not await cls._wait_for_form_closed(target_ctx):
+                    await cls._capture_error_screenshot(page, host_name)
+                    err_msg = f"Форма заявки не закрылась после сохранения для {host_name} (возможно, ошибка валидации на сервере)"
+                    logging.error(err_msg)
+                    emit_failed(err_msg)
+                    return
+
+                logging.info(f"Заявка ({status_action}) для {host_name} успешно заполнена и создана.")
+                emit_created()
+
+            except PlaywrightTimeoutError as e:
+                logging.error(f"Таймаут Playwright при обработке {host_name} ({url}): {e}")
+                await cls._capture_error_screenshot(page, host_name)
+                emit_failed(f"Таймаут страницы: {e}")
+            except asyncio.TimeoutError as e:
+                logging.error(f"Глобальный таймаут при обработке {host_name} ({url}): {e}")
+                await cls._capture_error_screenshot(page, host_name)
+                emit_failed(f"Глобальный таймаут: {e}")
             except Exception as e:
-                logging.error(f"Глобальная ошибка HelpdeskService ({host_name}): {e}", exc_info=True)
-                HelpdeskService.signals.ticket_failed.emit(host_name, status_action, f"Глобальная ошибка: {e}")
+                logging.error(f"Ошибка в процессе заполнения заявки для {host_name}: {e}")
+                await cls._capture_error_screenshot(page, host_name)
+                emit_failed(str(e))
+        except Exception as e:
+            logging.error(f"Глобальная ошибка HelpdeskService ({host_name}): {e}", exc_info=True)
+            emit_failed(f"Глобальная ошибка: {e}")

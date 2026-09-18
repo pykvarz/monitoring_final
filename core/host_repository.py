@@ -46,8 +46,8 @@ class HostRepository(QObject):
     
     # ==================== READ ====================
     
-    def get(self, host_id: str) -> Optional[Host]:
-        hosts = self._data_manager.get_hosts_by_ids([host_id])
+    def get(self, host_id: str, connection_name: str = None) -> Optional[Host]:
+        hosts = self._data_manager.get_hosts_by_ids([host_id], connection_name=connection_name)
         return hosts[0] if hosts else None
     
     def get_all(self, connection_name: str = None) -> List[Host]:

@@ -204,7 +204,7 @@ class MonitorThread(QThread):
                             
                             # Защита от гонки: если за время пинга оператор перевел узел
                             # в MAINTENANCE — отбрасываем устаревший результат пинга
-                            current_db_host = self._repository.get_by_id(host_id)
+                            current_db_host = self._repository.get(host_id, connection_name=connection_name)
                             if current_db_host and current_db_host.status == "MAINTENANCE":
                                 self._known_statuses[host_id] = "MAINTENANCE"
                                 continue

@@ -6,6 +6,7 @@
 
 import sys
 import os
+import time
 import unittest
 import pytest
 from unittest.mock import MagicMock, patch
@@ -19,6 +20,10 @@ from table_model import HostTableModel
 from monitor_thread import MonitorThread
 from host_manager import HostManager
 from dialogs import GroupManagerDialog
+from database import DatabaseManager
+from data_manager import DataManager
+from core.host_repository import HostRepository
+from services import PingService
 
 
 class TestPhase2StateDataIntegrity(unittest.TestCase):
@@ -131,3 +136,40 @@ class TestPhase2StateDataIntegrity(unittest.TestCase):
 
         self.assertEqual(thread._executor._max_workers, 12)
         thread.stop()
+
+
+def test_monitor_cycle_updates_host_through_thread_connection(tmp_path):
+    """Полный цикл мониторинга применяет результат пинга через реальный репозиторий."""
+    from PyQt5.QtSql import QSqlDatabase
+
+    app = QApplication.instance() or QApplication([])
+    if QSqlDatabase.contains("qt_sql_default_connection"):
+        existing = QSqlDatabase.database("qt_sql_default_connection", open=False)
+        existing.close()
+        del existing
+        QSqlDatabase.removeDatabase("qt_sql_default_connection")
+
+    db_manager = DatabaseManager(str(tmp_path / "monitor-cycle.db"))
+    repository = HostRepository(DataManager(db_manager))
+    host = Host(id="runtime-host", name="Runtime", ip="127.0.0.1", status="OFFLINE")
+    assert repository.add(host)
+
+    monitor = MonitorThread(repository, AppConfig(poll_interval=1), db_manager.db_name)
+    monitor.host_status_changed.connect(repository.update_status)
+    try:
+        with patch.object(PingService, "ping_host", return_value=True):
+            monitor.start()
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                app.processEvents()
+                current = repository.get(host.id)
+                if current and current.status == "ONLINE" and current.last_seen:
+                    break
+                time.sleep(0.01)
+
+        current = repository.get(host.id)
+        assert current.status == "ONLINE"
+        assert current.last_seen is not None
+    finally:
+        monitor.stop()
+        db_manager.close()
