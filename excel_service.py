@@ -33,16 +33,13 @@ class ExcelService:
                     group = str(row[3]).strip() if row[3] else "Без группы"
 
                     # Применяем ограничения символов (Slicing)
-                    if len(name) > 50:
-                        name = name[:50]
-                        errors.append(f"Строка {row_idx}: название обрезано до 50 символов")
-                    
-                    if len(ip) > 100:
-                        ip = ip[:100]
+                    if len(name) > 100:
+                        name = name[:100]
+                        errors.append(f"Строка {row_idx}: название обрезано до 100 символов")
 
-                    if len(address) > 150:
-                        address = address[:150]
-                        errors.append(f"Строка {row_idx}: адрес обрезан до 150 символов")
+                    if len(address) > 200:
+                        address = address[:200]
+                        errors.append(f"Строка {row_idx}: адрес обрезан до 200 символов")
 
                     if len(group) > 50:
                         group = group[:50]

@@ -47,9 +47,10 @@ class HelpdeskService:
 
     @classmethod
     async def _cleanup_browser_resources(cls, browser_holder):
+        browser_holder["stop_requested"] = True
         cleanup_tasks = []
-        browser = browser_holder.get("browser")
-        playwright = browser_holder.get("playwright")
+        browser = browser_holder.pop("browser", None)
+        playwright = browser_holder.pop("playwright", None)
         if browser:
             cleanup_tasks.append(asyncio.create_task(browser.close()))
         if playwright:
@@ -455,6 +456,29 @@ class HelpdeskService:
                     pass
             return False
 
+    @staticmethod
+    def _missing_required_fields(field_results: dict) -> list:
+        """Вернуть названия обязательных полей, которые не удалось заполнить."""
+        return [name for name, filled in field_results.items() if not filled]
+
+    @classmethod
+    async def _confirm_ticket_saved(cls, page, form_ctx, page_url_before_save: str) -> bool:
+        """Подтвердить закрытие формы без ухода со страницы Helpdesk на авторизацию."""
+        if not await cls._wait_for_form_closed(form_ctx):
+            return False
+
+        current_url = str(getattr(page, "url", "") or "")
+        before = urllib.parse.urlparse(page_url_before_save or "")
+        current = urllib.parse.urlparse(current_url)
+        auth_target = " ".join((current.path, current.query, current.fragment)).lower()
+        if re.search(r"(^|[/_.?=&\s-])(login|signin|sign-in|auth|sso)([/_.?=&\s-]|$)", auth_target):
+            return False
+        if before.netloc and current.netloc and before.netloc.lower() != current.netloc.lower():
+            return False
+        if before.path and current.path and before.path.rstrip("/") != current.path.rstrip("/"):
+            logging.info(f"Redirected to created ticket: {before.path} -> {current.path}")
+        return True
+
     # ==================== Основной процесс ====================
 
     @classmethod
@@ -579,6 +603,9 @@ class HelpdeskService:
             url = HelpdeskService.normalize_url(url)
             p = await async_playwright().start()
             terminal_state["playwright"] = p
+            if terminal_state.get("stop_requested"):
+                await cls._cleanup_browser_resources(terminal_state)
+                return
             logging.info(f"Запуск Playwright для {host_name} ({status_action}), URL: {url}, headless: {headless}")
             launch_args = cls.get_launch_args(url)
             for channel in ["msedge", "chrome", None]:
@@ -595,6 +622,9 @@ class HelpdeskService:
                 raise RuntimeError("Не удалось запустить браузер (Microsoft Edge или Chrome не найдены в системе)")
             if browser_holder is not None:
                 browser_holder["browser"] = browser
+            if terminal_state.get("stop_requested"):
+                await cls._cleanup_browser_resources(terminal_state)
+                return
 
             context = await browser.new_context()
             page = await context.new_page()
@@ -608,11 +638,11 @@ class HelpdeskService:
 
                 form_ctx = await cls._find_form_context(page)
 
-                await cls._select_dropdown(page, form_ctx, "gwt-debug-agreementServiceProperty-value", "Соглашение/Услуга", "Устройство самообслуживания")
+                agreement_ok = await cls._select_dropdown(page, form_ctx, "gwt-debug-agreementServiceProperty-value", "Соглашение/Услуга", "Устройство самообслуживания")
                 await page.wait_for_timeout(800)
-                await cls._select_dropdown(page, form_ctx, "gwt-debug-servCategory-value", "Категория услуги", "ATM")
+                category_ok = await cls._select_dropdown(page, form_ctx, "gwt-debug-servCategory-value", "Категория услуги", "ATM")
                 await page.wait_for_timeout(800)
-                await cls._select_dropdown(page, form_ctx, "gwt-debug-subCategory-value", "Подкатегория", "Статус 13")
+                subcategory_ok = await cls._select_dropdown(page, form_ctx, "gwt-debug-subCategory-value", "Подкатегория", "Статус 13")
                 await page.wait_for_timeout(800)
 
                 try:
@@ -629,15 +659,18 @@ class HelpdeskService:
                     f"2. Статус: Установить/Снять: {status_action}\n"
                     f"3. Причина: {reason}"
                 )
-                await cls._fill_description(page, form_ctx, description)
+                description_ok = await cls._fill_description(page, form_ctx, description)
 
-                if not loc_ok or not subj_ok:
+                missing = cls._missing_required_fields({
+                    "Соглашение/Услуга": agreement_ok,
+                    "Категория услуги": category_ok,
+                    "Подкатегория": subcategory_ok,
+                    "Местонахождение": loc_ok,
+                    "Тема": subj_ok,
+                    "Описание": description_ok,
+                })
+                if missing:
                     await cls._capture_error_screenshot(page, host_name)
-                    missing = []
-                    if not loc_ok:
-                        missing.append("Местонахождение")
-                    if not subj_ok:
-                        missing.append("Тема")
                     err_msg = f"Поля заявки ({', '.join(missing)}) не заполнены на форме для {host_name}"
                     logging.error(err_msg)
                     emit_failed(err_msg)
@@ -657,6 +690,7 @@ class HelpdeskService:
                     emit_failed(err_msg)
                     return
 
+                page_url_before_save = page.url
                 await save_btn.click(timeout=5000)
                 try:
                     await page.wait_for_load_state('networkidle', timeout=10000)
@@ -664,7 +698,7 @@ class HelpdeskService:
                     pass
 
                 target_ctx = form_ctx if form_ctx else page
-                if not await cls._wait_for_form_closed(target_ctx):
+                if not await cls._confirm_ticket_saved(page, target_ctx, page_url_before_save):
                     await cls._capture_error_screenshot(page, host_name)
                     err_msg = f"Форма заявки не закрылась после сохранения для {host_name} (возможно, ошибка валидации на сервере)"
                     logging.error(err_msg)

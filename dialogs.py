@@ -5,6 +5,7 @@
 """
 
 from typing import Optional
+from dataclasses import replace
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
     QCheckBox, QDialogButtonBox, QMessageBox, QGroupBox,
@@ -63,15 +64,15 @@ class HostDialog(QDialog):
         # Поля ввода
         self._name_edit = QLineEdit(self._host.name if self._host else "")
         self._name_edit.setPlaceholderText("Например: Сервер 1")
-        self._name_edit.setMaxLength(50)
+        self._name_edit.setMaxLength(100)
 
         self._ip_edit = QLineEdit(self._host.ip if self._host else "")
         self._ip_edit.setPlaceholderText("Например: 192.168.1.1")
-        self._ip_edit.setMaxLength(100) # Лимит для IP/Hostname
+        self._ip_edit.setMaxLength(253) # Лимит для IP/Hostname
 
         self._address_edit = QLineEdit(self._host.address if self._host else "")
         self._address_edit.setPlaceholderText("Например: Москва, ул. Ленина, д.1")
-        self._address_edit.setMaxLength(150)
+        self._address_edit.setMaxLength(200)
 
         self._group_combo = QComboBox()
         UIComponents.setup_combobox(self._group_combo, self._theme)
@@ -141,12 +142,14 @@ class HostDialog(QDialog):
         """Получение данных узла"""
         grp = self._group_combo.currentText().strip() or "Без группы"
         if self._host:
-            self._host.name = self._name_edit.text().strip()
-            self._host.ip = self._ip_edit.text().strip()
-            self._host.address = self._address_edit.text().strip()
-            self._host.group = grp
-            self._host.notifications_enabled = self._notify_check.isChecked()
-            return self._host
+            return replace(
+                self._host,
+                name=self._name_edit.text().strip(),
+                ip=self._ip_edit.text().strip(),
+                address=self._address_edit.text().strip(),
+                group=grp,
+                notifications_enabled=self._notify_check.isChecked(),
+            )
         else:
             return Host(
                 name=self._name_edit.text().strip(),

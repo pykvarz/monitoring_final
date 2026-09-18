@@ -164,10 +164,10 @@ class TestExcelService(unittest.TestCase):
         self.assertEqual(len(hosts), 2)
         self.assertEqual(skipped, 0)
     
-    def test_import_with_long_fields(self):
-        """Test importing hosts with fields exceeding length limits."""
-        long_name = "A" * 100  # Will be truncated to 50
-        long_address = "B" * 200  # Will be truncated to 150
+    def test_import_with_model_max_length_fields(self):
+        """Поля на границе ограничений Host импортируются без обрезки."""
+        long_name = "A" * 100
+        long_address = "B" * 200
         
         data = [
             [long_name, "192.168.1.1", long_address, "Group1"],
@@ -177,13 +177,11 @@ class TestExcelService(unittest.TestCase):
         existing_ips = set()
         hosts, skipped, errors = ExcelService.import_hosts(filepath, existing_ips)
         
-        # Should import with truncated fields
+        # Значения допустимы моделью и должны сохраниться без изменений.
         self.assertEqual(len(hosts), 1)
-        self.assertEqual(len(hosts[0].name), 50)
-        self.assertEqual(len(hosts[0].address), 150)
-        
-        # Should have error messages about truncation
-        self.assertGreater(len(errors), 0)
+        self.assertEqual(len(hosts[0].name), 100)
+        self.assertEqual(len(hosts[0].address), 200)
+        self.assertEqual(errors, [])
     
     def test_import_nonexistent_file(self):
         """Test importing from non-existent file."""

@@ -126,8 +126,8 @@ class MonitorThread(QThread):
         with self._executor_lock:
             if self._executor:
                 try:
-                    self._executor.shutdown(wait=False)
-                except RuntimeError:
+                    self._executor.shutdown(wait=False, cancel_futures=True)
+                except (RuntimeError, TypeError):
                     pass
         self.wait()
 
@@ -243,6 +243,10 @@ class MonitorThread(QThread):
                     
                     # Проверяем флаг прерывания
                     if self._interrupt_flag:
+                        if newly_offline:
+                            self.hosts_offline.emit(newly_offline)
+                        if newly_recovered:
+                            self.hosts_recovered.emit(newly_recovered)
                         logging.info("MonitorThread: Cycle interrupted, restarting immediately")
                         self._interrupt_flag = False
                         continue  # Немедленно начать новый цикл

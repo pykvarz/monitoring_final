@@ -89,6 +89,16 @@ class HostRepository(QObject):
                      offline_time: Optional[str] = None) -> bool:
         return self._data_manager.update_host_status(host_id, new_status, offline_since)
 
+    def apply_monitor_status(self, host_id: str, new_status: str,
+                             offline_since: Optional[str] = None) -> bool:
+        """Применить результат ping, не отменяя MAINTENANCE оператора."""
+        return self._data_manager.update_host_status(
+            host_id,
+            new_status,
+            offline_since,
+            preserve_maintenance=True,
+        )
+
     # ==================== COMPATIBILITY / HELPERS ====================
     
     def get_hosts_by_ids(self, ids: List[str]) -> List[Host]:

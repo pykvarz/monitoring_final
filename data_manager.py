@@ -206,14 +206,15 @@ class DataManager(QObject):
             return True
         return False
 
-    def update_host_status(self, host_id: str, status: str, offline_since: Optional[str] = None):
+    def update_host_status(self, host_id: str, status: str, offline_since: Optional[str] = None,
+                           preserve_maintenance: bool = False) -> bool:
         """
         Обновление статуса хоста.
         Если статус реально меняется — пишем событие в журнал истории (status_history).
         """
         db = self.db_manager.get_db()
         if not db.isOpen():
-            return
+            return False
 
         # Узнаём текущий (старый) статус и имя хоста — нужно и для проверки
         # "изменился ли статус", и для журнала (имя хранится отдельно на случай
@@ -246,26 +247,33 @@ class DataManager(QObject):
                     last_seen = :last_seen,
                     offline_since = :offline_since
                 WHERE id = :id
+                  AND (:preserve_maintenance = 0 OR status != 'MAINTENANCE')
             """
             query.prepare(sql)
             query.bindValue(":status", status)
             query.bindValue(":last_seen", datetime.now(timezone.utc).isoformat())
             query.bindValue(":offline_since", None)
             query.bindValue(":id", host_id)
+            query.bindValue(":preserve_maintenance", 1 if preserve_maintenance else 0)
         else:
             sql = """
                 UPDATE hosts 
                 SET status = :status, 
                     offline_since = :offline_since
                 WHERE id = :id
+                  AND (:preserve_maintenance = 0 OR status != 'MAINTENANCE')
             """
             query.prepare(sql)
             query.bindValue(":status", status)
             query.bindValue(":offline_since", offline_since)
             query.bindValue(":id", host_id)
+            query.bindValue(":preserve_maintenance", 1 if preserve_maintenance else 0)
         
         if query.exec_():
+            changed = query.numRowsAffected() > 0
             query.finish()
+            if not changed:
+                return False
             if old_status is not None and old_status != status:
                 self._add_history_event(host_id, host_name, old_status, status)
 
@@ -274,10 +282,12 @@ class DataManager(QObject):
                 self._changed_host_ids.add(host_id)
                 if not self._update_timer.isActive():
                     self._update_timer.start()
+            return True
         else:
             err = query.lastError().text()
             query.finish()
             logging.error(f"Failed to update host {host_id}: {err}")
+            return False
 
     def _add_history_event(self, host_id: str, host_name: str, old_status: str, new_status: str) -> None:
         """Запись события смены статуса в журнал истории"""
@@ -504,7 +514,7 @@ class DataManager(QObject):
             ip=query.value("ip"),
             name=query.value("name"),
             address=query.value("address") or "",
-            group=query.value("grp"),
+            group=query.value("grp") or "Без группы",
             status=st,
             last_seen=query.value("last_seen") or None,
             offline_since=offline_since,

@@ -74,7 +74,7 @@ class DatabaseManager:
             ip TEXT NOT NULL,
             name TEXT,
             address TEXT DEFAULT '',
-            grp TEXT DEFAULT 'Default',
+            grp TEXT DEFAULT 'Без группы',
             icon TEXT,
             status TEXT DEFAULT 'UNKNOWN',
             last_seen TEXT,

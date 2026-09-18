@@ -141,6 +141,10 @@ class Host:
 
     def __post_init__(self):
         """Валидация данных после инициализации"""
+        if self.address is None:
+            self.address = ""
+        if self.group is None:
+            self.group = "Без группы"
         if not self.name or not isinstance(self.name, str):
             raise ValueError("Имя узла обязательно и должно быть строкой")
         if not validate_ip_or_hostname(self.ip):

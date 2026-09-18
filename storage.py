@@ -7,7 +7,9 @@
 import json
 import dataclasses
 import logging
+import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Union
 from contextlib import contextmanager
@@ -97,8 +99,11 @@ class StorageManager(IStorageRepository):
         """Сохранение списка узлов"""
         with self._lock():
             try:
-                with open(self._hosts_file, 'w', encoding='utf-8') as f:
-                    json.dump([h.to_dict() for h in hosts], f, indent=2, ensure_ascii=False)
+                self._atomic_json_write(
+                    self._hosts_file,
+                    [h.to_dict() for h in hosts],
+                    ensure_ascii=False,
+                )
                 return True
             except (IOError, TypeError, PermissionError) as e:
                 logging.error(f"Ошибка сохранения узлов: {e}", exc_info=True)
@@ -113,6 +118,9 @@ class StorageManager(IStorageRepository):
             try:
                 with open(self._config_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                    if not isinstance(data, dict):
+                        logging.warning("Конфигурация должна быть JSON-объектом; используются значения по умолчанию")
+                        return AppConfig()
                     valid_keys = {f.name for f in dataclasses.fields(AppConfig)}
                     unknown_keys = set(data.keys()) - valid_keys
                     if unknown_keys:
@@ -131,12 +139,37 @@ class StorageManager(IStorageRepository):
         """Сохранение конфигурации"""
         with self._lock():
             try:
-                with open(self._config_file, 'w', encoding='utf-8') as f:
-                    json.dump(config.to_dict(), f, indent=2)
+                self._atomic_json_write(self._config_file, config.to_dict())
                 return True
             except (IOError, TypeError, PermissionError) as e:
                 logging.error(f"Ошибка сохранения конфигурации: {e}", exc_info=True)
                 return False
+
+    @staticmethod
+    def _atomic_json_write(path: Path, data, ensure_ascii: bool = True) -> None:
+        """Записать JSON через временный файл без риска усечь старые данные."""
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as stream:
+                temp_path = Path(stream.name)
+                json.dump(data, stream, indent=2, ensure_ascii=ensure_ascii)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp_path, path)
+        except Exception:
+            if temp_path is not None:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            raise
 
     def migrate_to_db(self, db_manager: DatabaseManager) -> bool:
         """Миграция данных из JSON в SQLite"""
@@ -156,7 +189,10 @@ class StorageManager(IStorageRepository):
         """)
         
         count = 0
-        db.transaction()
+        if not db.transaction():
+            logging.error(f"Не удалось начать транзакцию миграции: {db.lastError().text()}")
+            sql.finish()
+            return False
         try:
             for host in hosts:
                 sql.bindValue(":id", host.id)
@@ -169,17 +205,19 @@ class StorageManager(IStorageRepository):
                 sql.bindValue(":offline", host.offline_since)
                 sql.bindValue(":seen", host.last_seen)
                 
-                if sql.exec_():
-                    count += 1
-                else:
-                    logging.warning(f"Ошибка миграции хоста {host.ip}: {sql.lastError().text()}")
+                if not sql.exec_():
+                    raise RuntimeError(
+                        f"Ошибка миграции хоста {host.ip}: {sql.lastError().text()}"
+                    )
+                count += max(0, sql.numRowsAffected())
             
-            db.commit()
+            if not db.commit():
+                raise RuntimeError(f"Не удалось зафиксировать миграцию: {db.lastError().text()}")
             logging.info(f"Миграция завершена. Перенесено {count} записей.")
             
             # Переименовываем старый файл, чтобы не мигрировать снова
             try:
-                self._hosts_file.rename(self._hosts_file.with_suffix('.json.bak'))
+                os.replace(self._hosts_file, self._hosts_file.with_suffix('.json.bak'))
             except Exception as e:
                 logging.warning(f"Не удалось переименовать hosts.json: {e}")
                 

@@ -447,7 +447,7 @@ class MainWindow(QMainWindow):
         self._monitor_thread.scan_started.connect(self._on_scan_started)
         self._monitor_thread.scan_finished.connect(self._on_scan_finished)
         self._monitor_thread.paused_state_changed.connect(self._on_paused_state_changed)
-        self._monitor_thread.host_status_changed.connect(self._repository.update_status)
+        self._monitor_thread.host_status_changed.connect(self._repository.apply_monitor_status)
         self._monitor_thread.error_occurred.connect(lambda e: logging.error(f"MonitorThread Error: {e}"))
         self._monitor_thread.start()
 
@@ -486,7 +486,7 @@ class MainWindow(QMainWindow):
         self._table_model.set_hosts(hosts)
         
         # Обновляем группы
-        new_groups = sorted(list(set(h.group for h in hosts)))
+        new_groups = sorted(list({h.group or "Без группы" for h in hosts}))
         # Добавляем кастомные
         if hasattr(self._config, 'custom_groups'):
             new_groups = sorted(list(set(new_groups + self._config.custom_groups)))
@@ -535,6 +535,8 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(list)
     def _on_hosts_offline(self, offline_hosts: List[str]):
+        if not self._config.notifications_enabled:
+            return
         has_toast = hasattr(self, '_toast_manager') and self._toast_manager
         if has_toast:
             self._toast_manager.show_offline(offline_hosts)
@@ -542,6 +544,8 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(list)
     def _on_hosts_recovered(self, recovered_hosts: List[str]):
+        if not self._config.notifications_enabled:
+            return
         has_toast = hasattr(self, '_toast_manager') and self._toast_manager
         if has_toast:
             self._toast_manager.show_recovered(recovered_hosts)
