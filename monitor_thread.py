@@ -243,6 +243,10 @@ class MonitorThread(QThread):
                     
                     # Проверяем флаг прерывания
                     if self._interrupt_flag:
+                        # Отменяем незавершённые задачи пула, чтобы не занимать воркеры
+                        for f in futures:
+                            if not f.done():
+                                f.cancel()
                         if newly_offline:
                             self.hosts_offline.emit(newly_offline)
                         if newly_recovered:

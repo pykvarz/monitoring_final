@@ -64,9 +64,10 @@ class TestIPv6SecurityAndValidation:
             # Не должно быть уязвимой цепочки ['cmd', '/c', 'start']
             assert cmd_args[:3] != ['cmd', '/c', 'start'], "Не должен использоваться cmd /c start"
             # Аргументы должны запускать ping напрямую или через безопасный вызов консоли
-            assert 'ping' in cmd_args
-            assert '-t' in cmd_args
-            assert '192.168.1.1' in cmd_args
+            cmd_str = ' '.join(cmd_args)
+            assert 'ping' in cmd_str
+            assert '-t' in cmd_str
+            assert '192.168.1.1' in cmd_str
 
 
 class TestWin32ICMPv6Structure:

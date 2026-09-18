@@ -642,10 +642,6 @@ class MainWindow(QMainWindow):
 
     def _export_to_excel(self):
         hosts = self._repository.get_all()
-        # Export filtered list or all? Currently passing all from repo.
-        # But if table filters are active, user might expect filtered export?
-        # HostManager has filtered logic? 
-        # Typically Export ALL is safer default unless "Export View" asked.
         self._export_import_manager.export_to_excel(hosts)
 
 

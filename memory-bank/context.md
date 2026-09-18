@@ -67,7 +67,7 @@ Windows 10/11. Поставка в виде автономного `.exe` (PyIns
 | Экспорт/Импорт | openpyxl | 3.1.5 |
 | Helpdesk | playwright | 1.62.0 (системный Edge/Chrome, опционально) |
 | Сборка | PyInstaller | NetworkMonitor.spec / build_exe.py |
-| Тесты | pytest | 274 теста + 59 subtests |
+| Тесты | pytest | 279 тестов + 59 subtests |
 
 ### Команды
 - Установка зависимостей: `pip install -r requirements.txt`
@@ -101,10 +101,15 @@ Windows 10/11. Поставка в виде автономного `.exe` (PyIns
 - [x] Импорт/экспорт Excel с защитой от Formula Injection (CWE-1236)
 - [x] Поддержка адресов IPv6 и однокомпонентных сетевых имен (`localhost`, `router`, `nas`)
 - [x] Полнофункциональное управление группами узлов (создание, переименование с миграцией в БД, удаление с безопасным переносом в «Без группы»)
-- [x] Полный набор тестов (pytest, 274 теста + 59 subtests: все пройдены)
+- [x] Полный набор тестов (pytest, 279 тестов + 59 subtests: все пройдены)
 - [x] Сборка .exe (PyInstaller + build_exe.py)
 
 ### Последние обновления
+- **2026-09-18 — устранение замечаний LOW и INFO аудита:**
+  - `MonitorThread`: при прерывании цикла (`interrupt_cycle`) незавершённые задачи пула потоков (`futures`) отменяются через `f.cancel()`, освобождая воркеры пула от устаревших проверок.
+  - `ContextMenuManager`: заголовок окна консольного пинга Windows теперь передаётся в команду консоли `cmd.exe /k "title {title} && ping -t {ip}"`, устранив неиспользуемую переменную `title`.
+  - `MainWindow`: удалены черновые комментарии-вопросы из метода `_export_to_excel`.
+  - Добавлен регрессионный тест `test_monitor_interrupt_cycle_cancels_pending_futures`. Тестовый набор расширен до 279 тестов + 59 subtests (все пройдены).
 - **2026-09-18 — устранение 4 дефектов аудита (3 HIGH + 1 MEDIUM + 1 LOW):**
   - `Host.__post_init__` нормализует `None` в `address` (→ `""`) и `group` (→ `"Без группы"`) до проверки длины, предотвращая `TypeError` при загрузке записей с `NULL` из SQLite. В `data_manager.py` добавлен fallback `or "Без группы"` при чтении `grp`.
   - Миграция JSON → SQLite использует `os.replace` вместо `Path.rename`, устранив `FileExistsError [WinError 183]` на Windows при существующем `.json.bak`.

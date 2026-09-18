@@ -63,7 +63,8 @@ class TestContextMenuManager(unittest.TestCase):
         mock_warning.assert_not_called()
         mock_popen.assert_called_once()
         args = mock_popen.call_args[0][0]
-        self.assertIn(valid_ip, args)
+        cmd_str = ' '.join(args)
+        self.assertIn(valid_ip, cmd_str)
 
     @patch("context_menu_manager.subprocess.Popen")
     @patch("context_menu_manager.sys")
@@ -77,7 +78,7 @@ class TestContextMenuManager(unittest.TestCase):
         mock_popen.assert_called_once()
         args, kwargs = mock_popen.call_args
         cmd_args = args[0]
-        self.assertEqual(cmd_args, ['cmd.exe', '/k', 'ping', '-t', '192.168.1.10'])
+        self.assertEqual(cmd_args, ['cmd.exe', '/k', 'title Ping ATM-01 (192.168.1.10) && ping -t 192.168.1.10'])
         self.assertIn('creationflags', kwargs)
 
     @patch("context_menu_manager.subprocess.Popen")
@@ -92,7 +93,7 @@ class TestContextMenuManager(unittest.TestCase):
         mock_popen.assert_called_once()
         args, kwargs = mock_popen.call_args
         cmd_args = args[0]
-        self.assertEqual(cmd_args, ['cmd.exe', '/k', 'ping', '-t', '192.168.1.10'])
+        self.assertEqual(cmd_args, ['cmd.exe', '/k', 'title Ping 192.168.1.10 && ping -t 192.168.1.10'])
         self.assertIn('creationflags', kwargs)
 
     @patch("context_menu_manager.subprocess.Popen")

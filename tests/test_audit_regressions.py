@@ -360,3 +360,49 @@ def test_helpdesk_allows_same_domain_path_redirect():
 
     assert asyncio.run(run()) is True
 
+
+def test_monitor_interrupt_cycle_cancels_pending_futures():
+    """Прерывание цикла должно отменять незавершённые задачи (futures)."""
+    app = _TEST_APP
+    h1 = Host(id="h1", name="H1", ip="127.0.0.1", status="ONLINE")
+    h2 = Host(id="h2", name="H2", ip="127.0.0.2", status="ONLINE")
+    repository = MagicMock()
+    calls = 0
+
+    def get_all(connection_name=None):
+        nonlocal calls
+        calls += 1
+        return [h1, h2] if calls == 1 else []
+
+    repository.get_all.side_effect = get_all
+    repository.get.return_value = h1
+    config = AppConfig(poll_interval=60, max_workers=1)
+    monitor = MonitorThread(repository, config, db_name=":memory:")
+
+    h2_started = threading.Event()
+    h2_blocked = threading.Event()
+
+    def check_host(host):
+        if host.id == "h1":
+            monitor.interrupt_cycle()
+            return (host.id, "ONLINE", None)
+        else:
+            h2_started.set()
+            h2_blocked.wait(timeout=2)
+            return (host.id, "ONLINE", None)
+
+    monitor._check_host = check_host
+    try:
+        monitor.start()
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline and monitor._running:
+            app.processEvents()
+            time.sleep(0.02)
+            if not monitor._interrupt_flag and calls > 1:
+                break
+    finally:
+        h2_blocked.set()
+        monitor.stop()
+
+    assert not h2_started.is_set(), "h2 должен был быть отменён в очереди пула при прерывании цикла"
+

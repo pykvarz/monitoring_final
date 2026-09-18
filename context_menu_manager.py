@@ -258,13 +258,12 @@ class ContextMenuManager:
 
         try:
             if sys.platform == "win32":
-                safe_label = re.sub(r'\s+', ' ', re.sub(r'[\"&|<>^%]', '', label)).strip() if label else None
+                safe_label = re.sub(r'\s+', ' ', re.sub(r'[\\"&|<>^%]', '', label)).strip() if label else None
                 title = f"Ping {safe_label} ({ip})" if safe_label else f"Ping {ip}"
                 # Прямой безопасный запуск ping в отдельной консоли Windows без уязвимого интерпретатора cmd /c start
                 flags = getattr(subprocess, 'CREATE_NEW_CONSOLE', 0x00000010)
-                subprocess.Popen(['cmd.exe', '/k', 'ping', '-t', ip], creationflags=flags)
+                subprocess.Popen(['cmd.exe', '/k', f'title {title} && ping -t {ip}'], creationflags=flags)
             else:
                 subprocess.Popen(['xterm', '-e', 'ping', ip])
         except Exception as e:
             QMessageBox.warning(self._parent, "Ошибка", f"Не удалось открыть терминал: {e}")
-
