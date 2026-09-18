@@ -15,14 +15,32 @@ try:
 except ImportError:
     pass
 
+import ctypes
+
 from models import AppConfig
 from interfaces import INotificationService, IPingService
+
+
+class IPV6_ADDRESS_EX(ctypes.Structure):
+    _fields_ = [
+        ("sin6_port", ctypes.c_ushort),
+        ("sin6_flowinfo", ctypes.c_ulong),
+        ("sin6_addr", ctypes.c_ushort * 8),
+        ("sin6_scope_id", ctypes.c_ulong),
+    ]
+
+
+class ICMPV6_ECHO_REPLY(ctypes.Structure):
+    _fields_ = [
+        ("Address", IPV6_ADDRESS_EX),
+        ("Status", ctypes.c_ulong),
+        ("RoundTripTime", ctypes.c_uint),
+    ]
 
 
 _IS_WINDOWS = platform.system().lower() == 'windows'
 
 if _IS_WINDOWS:
-    import ctypes
     from ctypes import wintypes
 
     try:
@@ -304,11 +322,11 @@ class PingService(IPingService):
                         timeout_ms
                     )
                     if ret > 0:
-                        # В структуре ICMPV6_ECHO_REPLY поле Status (ULONG) находится со смещением 32
-                        # IPV6_ADDRESS_EX (32 байта) + Status (4 байта, 0 = IP_SUCCESS)
+                        # В структуре ICMPV6_ECHO_REPLY поле Status (ULONG) находится со смещением 28
+                        # Address (IPV6_ADDRESS_EX, 28 байт) + Status (4 байта, 0 = IP_SUCCESS)
                         try:
-                            status = struct.unpack_from('<I', reply_buffer.raw, 32)[0]
-                            return status == 0
+                            reply = ICMPV6_ECHO_REPLY.from_buffer_copy(reply_buffer.raw)
+                            return reply.Status == 0
                         except Exception:
                             return True
                     return False

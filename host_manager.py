@@ -45,19 +45,23 @@ class HostManager:
             QMessageBox.information(parent, "Информация", "Выберите узлы для удаления")
             return
         
+        # Фиксируем ID выбранных узлов ДО открытия модального диалога
+        ids_to_delete = []
+        for index in selected_indexes:
+            host = table_model.get_host(index.row())
+            if host:
+                ids_to_delete.append(host.id)
+
+        if not ids_to_delete:
+            return
+
         reply = QMessageBox.question(
             parent, "Подтверждение",
-            f"Удалить выбранные узлы ({len(selected_indexes)} шт.)?",
+            f"Удалить выбранные узлы ({len(ids_to_delete)} шт.)?",
             QMessageBox.Yes | QMessageBox.No
         )
         
         if reply == QMessageBox.Yes:
-            ids_to_delete = []
-            for index in selected_indexes:
-                host = table_model.get_host(index.row())
-                if host:
-                    ids_to_delete.append(host.id)
-            
             for hid in ids_to_delete:
                 repository.delete(hid)
 
@@ -160,6 +164,16 @@ class HostManager:
             QMessageBox.information(parent, "Информация", "Выберите узлы")
             return
         
+        # Фиксируем ID выбранных узлов ДО открытия диалогов
+        ids = []
+        for index in selected_indexes:
+            host = table_model.get_host(index.row())
+            if host:
+                ids.append(host.id)
+
+        if not ids:
+            return
+
         dialog = QInputDialog(parent)
         dialog.setWindowTitle("Изменение группы")
         dialog.setLabelText("Выберите новую группу:")
@@ -188,12 +202,10 @@ class HostManager:
                 return
             new_group = new_group.strip()
             
-        ids = []
-        for index in selected_indexes:
-            host = table_model.get_host(index.row())
-            if host:
-                ids.append(host.id)
-                
+        if len(new_group) > 50:
+            QMessageBox.warning(parent, "Внимание", "Название группы не должно превышать 50 символов.")
+            return
+
         hosts = repository.get_hosts_by_ids(ids)
         for host in hosts:
             host.group = new_group

@@ -550,6 +550,12 @@ class DataManager(QObject):
         Переименование группы узлов в БД.
         Возвращает количество обновленных узлов.
         """
+        if not new_name or not isinstance(new_name, str):
+            raise ValueError("Новое название группы обязательно и должно быть строкой")
+        new_name = new_name.strip()
+        if len(new_name) > 50:
+            raise ValueError("Слишком длинное название группы (максимум 50 символов)")
+
         db = self.db_manager.get_db()
         if not db.isOpen() or not old_name or not new_name:
             return 0

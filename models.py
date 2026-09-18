@@ -59,6 +59,22 @@ def validate_ip(ip: str) -> bool:
         return False
     
     ip = ip.strip()
+    if '%' in ip:
+        parts = ip.split('%')
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            return False
+        # Проверяем, что до % валидный IPv6
+        try:
+            addr = ipaddress.ip_address(parts[0])
+            if addr.version != 6:
+                return False
+        except ValueError:
+            return False
+        # Строгая валидация идентификатора зоны (RFC 4007): только алфавитно-цифровые символы, дефис, точка, подчеркивание
+        if not re.match(r'^[a-zA-Z0-9._-]+$', parts[1]):
+            return False
+        return True
+
     try:
         ipaddress.ip_address(ip)
         return True

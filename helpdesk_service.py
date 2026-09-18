@@ -72,12 +72,14 @@ class HelpdeskService:
 
     @classmethod
     def _log_future_error(cls, future, host_name: str, action: str):
-        """Callback для логирования ошибок из фоновых корутин"""
+        """Callback для логирования ошибок из фоновых корутин и гарантированной отправки ticket_failed"""
         def _callback(fut):
             try:
                 fut.result()
             except Exception as e:
-                logging.error(f"HelpdeskService: Ошибка заявки ({action}) для {host_name}: {e}")
+                err_msg = f"Ошибка заявки ({action}) для {host_name}: {e}"
+                logging.error(f"HelpdeskService: {err_msg}")
+                cls.signals.ticket_failed.emit(host_name, action, err_msg)
         future.add_done_callback(_callback)
 
     @classmethod
@@ -100,7 +102,7 @@ class HelpdeskService:
         for host in hosts:
             logging.info(f"HelpdeskService: Планирование заявки (Установить) для {host} (headless={headless})")
             future = asyncio.run_coroutine_threadsafe(
-                asyncio.wait_for(cls._process_ticket_task_async(config.helpdesk_url, host, "Установить", reason, headless=headless), timeout=60.0),
+                cls._process_ticket_task_async(config.helpdesk_url, host, "Установить", reason, headless=headless),
                 cls._loop
             )
             cls._log_future_error(future, host, "Установить")
@@ -114,7 +116,7 @@ class HelpdeskService:
         for host in hosts:
             logging.info(f"HelpdeskService: Планирование заявки (Снять) для {host} (headless={headless})")
             future = asyncio.run_coroutine_threadsafe(
-                asyncio.wait_for(cls._process_ticket_task_async(config.helpdesk_url, host, "Снять", reason, headless=headless), timeout=60.0),
+                cls._process_ticket_task_async(config.helpdesk_url, host, "Снять", reason, headless=headless),
                 cls._loop
             )
             cls._log_future_error(future, host, "Снять")
@@ -150,10 +152,11 @@ class HelpdeskService:
         return f"0000{name}"
 
     @staticmethod
-    def get_launch_args(url: str) -> list:
+    def get_launch_args(url: str, enable_delegation: bool = False) -> list:
         """
         Формирует аргументы запуска браузера с поддержкой Windows SSO / NTLM / Kerberos.
-        Исключает кавычки в значениях флагов, блокирующие распознавание домена Chromium.
+        Исключает кавычки в значениях флагов и использует строгий доменный allowlist
+        без опасного широкого совпадения *domain* и без неконтролируемого делегирования Kerberos.
         """
         args = [
             '--auth-schemes=basic,digest,ntlm,negotiate',
@@ -165,8 +168,10 @@ class HelpdeskService:
                 domain = domain.split(":")[0]
             domain = domain.strip()
             if domain:
-                args.insert(0, f'--auth-server-allowlist=*{domain}*')
-                args.insert(1, f'--auth-negotiate-delegate-allowlist=*{domain}*')
+                # Строгий доменный allowlist: точное имя хоста и его поддомены
+                args.insert(0, f'--auth-server-allowlist={domain},*.{domain}')
+                if enable_delegation:
+                    args.insert(1, f'--auth-negotiate-delegate-allowlist={domain},*.{domain}')
         return args
 
     # ==================== Утилиты формы Naumen SD ====================
@@ -188,13 +193,20 @@ class HelpdeskService:
             contexts = [page] + list(page.frames)
             for search_ctx in contexts:
                 try:
-                    marker = search_ctx.locator(
+                    # 1. Поиск по CSS маркерам (gwt-debug ID)
+                    css_marker = search_ctx.locator(
                         "#gwt-debug-location-value, #gwt-debug-shortDescr-value, #gwt-debug-servCategory-value, "
-                        "#gwt-debug-agreementServiceProperty-value, #gwt-debug-subCategory-value, #gwt-debug-apply, "
+                        "#gwt-debug-agreementServiceProperty-value, #gwt-debug-subCategory-value, #gwt-debug-apply"
+                    ).first
+                    if await css_marker.count() > 0 and await css_marker.is_visible():
+                        return search_ctx
+
+                    # 2. Поиск по XPath маркерам (раздельно от CSS во избежание синтаксических ошибок в браузере)
+                    xpath_marker = search_ctx.locator(
                         "xpath=//*[self::label or self::div or self::span or self::td or self::th]"
                         "[contains(normalize-space(), 'Местонахождение') or contains(normalize-space(), 'Соглашение')]"
                     ).first
-                    if await marker.count() > 0 and await marker.is_visible():
+                    if await xpath_marker.count() > 0 and await xpath_marker.is_visible():
                         return search_ctx
                 except Exception:
                     continue
@@ -463,10 +475,11 @@ class HelpdeskService:
                         except Exception:
                             pass
 
-                        # 6. Пост-сохранительная верификация: форма должна исчезнуть
+                        # 6. Пост-сохранительная верификация: форма должна исчезнуть (проверяем в контексте формы)
+                        target_ctx = form_ctx if form_ctx else page
                         form_still_visible = False
                         try:
-                            marker = page.locator("#gwt-debug-location-value, #gwt-debug-shortDescr-value").first
+                            marker = target_ctx.locator("#gwt-debug-location-value, #gwt-debug-shortDescr-value").first
                             await marker.wait_for(state="hidden", timeout=5000)
                         except Exception:
                             form_still_visible = True

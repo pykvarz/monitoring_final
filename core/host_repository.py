@@ -120,6 +120,11 @@ class HostRepository(QObject):
 
     def rename_group(self, old_name: str, new_name: str) -> int:
         """Переименование группы узлов в БД"""
+        if not new_name or not isinstance(new_name, str):
+            raise ValueError("Новое название группы обязательно и должно быть строкой")
+        new_name = new_name.strip()
+        if len(new_name) > 50:
+            raise ValueError("Слишком длинное название группы (максимум 50 символов)")
         return self._data_manager.rename_group(old_name, new_name)
 
     def delete_group(self, group_name: str, fallback_group: str = "Без группы") -> int:

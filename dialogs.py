@@ -506,6 +506,9 @@ class GroupManagerDialog(QDialog):
         name = name.strip()
         if not name:
             return
+        if len(name) > 50:
+            QMessageBox.warning(self, "Внимание", "Название группы не должно превышать 50 символов.")
+            return
         if name in self._config.custom_groups or name == "Без группы":
             QMessageBox.warning(self, "Внимание", f"Группа '{name}' уже существует.")
             return
@@ -529,6 +532,9 @@ class GroupManagerDialog(QDialog):
             return
         new_name = new_name.strip()
         if not new_name or new_name == selected:
+            return
+        if len(new_name) > 50:
+            QMessageBox.warning(self, "Внимание", "Название группы не должно превышать 50 символов.")
             return
         if new_name in self._config.custom_groups or new_name == "Без группы":
             QMessageBox.warning(self, "Внимание", f"Группа '{new_name}' уже существует.")

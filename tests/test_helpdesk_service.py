@@ -88,11 +88,11 @@ class TestHelpdeskLaunchArgs(unittest.TestCase):
         for arg in args:
             self.assertNotIn('"', arg, f"Аргумент содержит двойные кавычки: {arg}")
 
-        # 2. Должен быть правильный auth-server-allowlist без кавычек
-        self.assertIn("--auth-server-allowlist=*helpdesk.eub.kz*", args)
+        # 2. Должен быть строгий auth-server-allowlist без кавычек и широких масок
+        self.assertIn("--auth-server-allowlist=helpdesk.eub.kz,*.helpdesk.eub.kz", args)
 
-        # 3. Должно быть делегирование Kerberos
-        self.assertIn("--auth-negotiate-delegate-allowlist=*helpdesk.eub.kz*", args)
+        # 3. Делегирование Kerberos отключено по умолчанию
+        self.assertNotIn("--auth-negotiate-delegate-allowlist", " ".join(args))
 
         # 4. Должны быть схемы авторизации
         self.assertIn("--auth-schemes=basic,digest,ntlm,negotiate", args)
@@ -103,8 +103,7 @@ class TestHelpdeskLaunchArgs(unittest.TestCase):
     def test_launch_args_handles_ports_and_paths(self):
         """Проверка извлечения чистого домена при наличии порта."""
         args = HelpdeskService.get_launch_args("http://hd.company.local:8080/sd/")
-        self.assertIn("--auth-server-allowlist=*hd.company.local*", args)
-        self.assertIn("--auth-negotiate-delegate-allowlist=*hd.company.local*", args)
+        self.assertIn("--auth-server-allowlist=hd.company.local,*.hd.company.local", args)
 
     def test_launch_args_fallback_on_empty_url(self):
         """Проверка формирования аргументов при пустом или некорректном URL."""

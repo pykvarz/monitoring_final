@@ -3,7 +3,8 @@ from unittest.mock import MagicMock, patch
 import sys
 import os
 
-from PyQt5.QtCore import QCoreApplication, QPoint
+from PyQt5.QtCore import QPoint
+from PyQt5.QtWidgets import QApplication
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -14,8 +15,7 @@ from models import Host
 class TestContextMenuManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not QCoreApplication.instance():
-            cls.app = QCoreApplication([])
+        cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
         self.mock_parent = MagicMock()
@@ -68,42 +68,32 @@ class TestContextMenuManager(unittest.TestCase):
     @patch("context_menu_manager.subprocess.Popen")
     @patch("context_menu_manager.sys")
     @patch("context_menu_manager.QMessageBox.warning")
-    def test_ping_cmd_windows_explicit_title(self, mock_warning, mock_sys, mock_popen):
-        """Test that Windows cmd start includes explicit window title."""
+    def test_ping_cmd_windows_safe_launch(self, mock_warning, mock_sys, mock_popen):
+        """Test that Windows launches ping safely in a separate console without cmd /c start."""
         mock_sys.platform = "win32"
         self.manager._ping_cmd("192.168.1.10", label="ATM-01")
 
         mock_warning.assert_not_called()
         mock_popen.assert_called_once()
-        args = mock_popen.call_args[0][0]
-        self.assertEqual(args, ['cmd', '/c', 'start', 'Ping ATM-01 (192.168.1.10)', 'cmd', '/k', 'ping', '-t', '192.168.1.10'])
-
-    @patch("context_menu_manager.subprocess.Popen")
-    @patch("context_menu_manager.sys")
-    @patch("context_menu_manager.QMessageBox.warning")
-    def test_ping_cmd_windows_sanitizes_dangerous_label(self, mock_warning, mock_sys, mock_popen):
-        """Test that dangerous characters in label are stripped to prevent command injection."""
-        mock_sys.platform = "win32"
-        self.manager._ping_cmd("192.168.1.10", label='ATM" & calc & "')
-
-        mock_warning.assert_not_called()
-        mock_popen.assert_called_once()
-        args = mock_popen.call_args[0][0]
-        self.assertEqual(args, ['cmd', '/c', 'start', 'Ping ATM calc (192.168.1.10)', 'cmd', '/k', 'ping', '-t', '192.168.1.10'])
-
+        args, kwargs = mock_popen.call_args
+        cmd_args = args[0]
+        self.assertEqual(cmd_args, ['cmd.exe', '/k', 'ping', '-t', '192.168.1.10'])
+        self.assertIn('creationflags', kwargs)
 
     @patch("context_menu_manager.subprocess.Popen")
     @patch("context_menu_manager.sys")
     @patch("context_menu_manager.QMessageBox.warning")
     def test_ping_cmd_windows_without_label(self, mock_warning, mock_sys, mock_popen):
-        """Test that Windows cmd start without label uses IP in title."""
+        """Test that Windows ping launch without label works safely."""
         mock_sys.platform = "win32"
         self.manager._ping_cmd("192.168.1.10")
 
         mock_warning.assert_not_called()
         mock_popen.assert_called_once()
-        args = mock_popen.call_args[0][0]
-        self.assertEqual(args, ['cmd', '/c', 'start', 'Ping 192.168.1.10', 'cmd', '/k', 'ping', '-t', '192.168.1.10'])
+        args, kwargs = mock_popen.call_args
+        cmd_args = args[0]
+        self.assertEqual(cmd_args, ['cmd.exe', '/k', 'ping', '-t', '192.168.1.10'])
+        self.assertIn('creationflags', kwargs)
 
     @patch("context_menu_manager.subprocess.Popen")
     @patch("context_menu_manager.sys")

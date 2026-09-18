@@ -124,8 +124,20 @@ class HostTableModel(QAbstractTableModel):
         # сразу перемещались на своё место в таблице.
         if status_changed and self._sort_column is not None:
             self.layoutAboutToBeChanged.emit()
+            old_persistent = self.persistentIndexList()
+            old_ids = [self._hosts[idx.row()].id if idx.isValid() and 0 <= idx.row() < len(self._hosts) else None for idx in old_persistent]
+
             self._apply_sort()
             self._host_map = {h.id: i for i, h in enumerate(self._hosts)}
+
+            new_persistent = []
+            for idx, host_id in zip(old_persistent, old_ids):
+                if host_id and host_id in self._host_map:
+                    new_persistent.append(self.index(self._host_map[host_id], idx.column()))
+                else:
+                    new_persistent.append(QModelIndex())
+
+            self.changePersistentIndexList(old_persistent, new_persistent)
             self.layoutChanged.emit()
         else:
             # Статус не менялся — достаточно перерисовать изменённые ячейки
@@ -244,6 +256,9 @@ class HostTableModel(QAbstractTableModel):
         """Сортировка данных в таблице (вызывается кликом по заголовку)"""
         self.layoutAboutToBeChanged.emit()
 
+        old_persistent = self.persistentIndexList()
+        old_ids = [self._hosts[idx.row()].id if idx.isValid() and 0 <= idx.row() < len(self._hosts) else None for idx in old_persistent]
+
         self._sort_column = column
         self._sort_order = order
         self._apply_sort()
@@ -252,6 +267,14 @@ class HostTableModel(QAbstractTableModel):
         # статусов (update_hosts) попадали бы в неверные строки после сортировки
         self._host_map = {h.id: i for i, h in enumerate(self._hosts)}
 
+        new_persistent = []
+        for idx, host_id in zip(old_persistent, old_ids):
+            if host_id and host_id in self._host_map:
+                new_persistent.append(self.index(self._host_map[host_id], idx.column()))
+            else:
+                new_persistent.append(QModelIndex())
+
+        self.changePersistentIndexList(old_persistent, new_persistent)
         self.layoutChanged.emit()
 
     def _apply_sort(self):

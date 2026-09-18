@@ -75,9 +75,9 @@ class MonitorThread(QThread):
 
     def update_config(self, config: AppConfig) -> None:
         """Обновление конфигурации"""
-        old_max_workers = self._config.max_workers
+        current_workers = self._executor._max_workers if self._executor else 0
         self._config = config
-        if config.max_workers != old_max_workers:
+        if config.max_workers != current_workers:
             self._update_executor()
 
     def force_scan(self) -> None:
@@ -202,7 +202,13 @@ class MonitorThread(QThread):
                         try:
                             host_id, ping_status, error = future.result()
                             
-                            # Логика смены статуса (Domain Logic)
+                            # Защита от гонки: если за время пинга оператор перевел узел
+                            # в MAINTENANCE — отбрасываем устаревший результат пинга
+                            current_db_host = self._repository.get_by_id(host_id)
+                            if current_db_host and current_db_host.status == "MAINTENANCE":
+                                self._known_statuses[host_id] = "MAINTENANCE"
+                                continue
+
                             # Логика смены статуса (Domain Logic)
                             new_status, offline_since, should_update = self._calculate_status(host, ping_status, current_time)
 
@@ -290,6 +296,10 @@ class MonitorThread(QThread):
         Pure function to calculate next status.
         Returns: (new_status, offline_since, should_update)
         """
+        # Если узел на тех.обслуживании — любой результат пинга игнорируется
+        if host.status == "MAINTENANCE":
+            return "MAINTENANCE", host.offline_since, False
+
         new_status = host.status
         offline_since = host.offline_since
         should_update = False
