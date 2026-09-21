@@ -250,6 +250,73 @@ def test_helpdesk_rejects_login_redirect_after_save():
     assert not asyncio.run(run())
 
 
+def test_helpdesk_rejects_error_page_after_save():
+    async def run():
+        page = MagicMock()
+        page.url = "https://helpdesk.example/error"
+        page.locator.return_value.first.inner_text = AsyncMock(return_value="Ошибка сервера")
+        with patch.object(HelpdeskService, "_wait_for_form_closed", new=AsyncMock(return_value=True)):
+            return await HelpdeskService._confirm_ticket_saved(page, MagicMock(), "https://helpdesk.example/form")
+    assert not asyncio.run(run())
+
+
+def test_helpdesk_rejects_non_ticket_id_redirect():
+    async def run():
+        page = MagicMock()
+        page.url = "https://helpdesk.example/request/error"
+        page.locator.return_value.first.inner_text = AsyncMock(return_value="Ошибка сервера")
+        with patch.object(HelpdeskService, "_wait_for_form_closed", new=AsyncMock(return_value=True)):
+            return await HelpdeskService._confirm_ticket_saved(page, MagicMock(), "https://helpdesk.example/form")
+    assert not asyncio.run(run())
+
+
+def test_helpdesk_requires_positive_save_confirmation():
+    async def run(message):
+        page = MagicMock()
+        page.url = "https://helpdesk.example/form"
+        page.locator.return_value.first.inner_text = AsyncMock(return_value=message)
+        with patch.object(HelpdeskService, "_wait_for_form_closed", new=AsyncMock(return_value=True)):
+            return await HelpdeskService._confirm_ticket_saved(page, MagicMock(), page.url)
+    assert not asyncio.run(run("Форма закрыта"))
+    assert not asyncio.run(run("Заявка не создана"))
+    assert asyncio.run(run("Заявка успешно создана №12345"))
+
+
+def test_helpdesk_accepts_confirmation_in_iframe():
+    async def run():
+        page = MagicMock()
+        page.url = "https://helpdesk.example/sd/operator/"
+        page.locator.return_value.first.inner_text = AsyncMock(return_value="Оператор")
+        frame = MagicMock()
+        frame.locator.return_value.first.inner_text = AsyncMock(return_value="Заявка успешно создана №12345")
+        page.frames = [frame]
+        with patch.object(HelpdeskService, "_wait_for_form_closed", new=AsyncMock(return_value=True)):
+            return await HelpdeskService._confirm_ticket_saved(page, frame, page.url)
+    assert asyncio.run(run())
+
+
+def test_load_hosts_skips_non_object_entries(tmp_path):
+    storage = StorageManager(tmp_path)
+    storage.hosts_file.write_text(json.dumps([None, {"name": "ATM", "ip": "127.0.0.1"}]), encoding="utf-8")
+    assert [host.name for host in storage.load_hosts()] == ["ATM"]
+
+
+def test_load_config_rejects_invalid_nested_types(tmp_path):
+    storage = StorageManager(tmp_path)
+    storage.config_file.write_text(json.dumps({"poll_interval": 77, "column_widths": [100]}), encoding="utf-8")
+    config = storage.load_config()
+    assert config.poll_interval == 77
+    assert config.column_widths == {}
+
+
+def test_load_config_rejects_invalid_collection_elements(tmp_path):
+    storage = StorageManager(tmp_path)
+    storage.config_file.write_text(json.dumps({"custom_groups": ["ATM", 42], "column_widths": {"0": "wide"}}), encoding="utf-8")
+    config = storage.load_config()
+    assert config.custom_groups == []
+    assert config.column_widths == {}
+
+
 def test_helpdesk_reports_every_missing_required_field():
     """Все обязательные поля Helpdesk должны участвовать в проверке до Save."""
     missing = HelpdeskService._missing_required_fields({
@@ -405,4 +472,3 @@ def test_monitor_interrupt_cycle_cancels_pending_futures():
         monitor.stop()
 
     assert not h2_started.is_set(), "h2 должен был быть отменён в очереди пула при прерывании цикла"
-

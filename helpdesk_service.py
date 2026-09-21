@@ -475,9 +475,21 @@ class HelpdeskService:
             return False
         if before.netloc and current.netloc and before.netloc.lower() != current.netloc.lower():
             return False
-        if before.path and current.path and before.path.rstrip("/") != current.path.rstrip("/"):
-            logging.info(f"Redirected to created ticket: {before.path} -> {current.path}")
-        return True
+        ticket_id = r"(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+        if re.search(rf"/(?:ticket|servicecall|request)/{ticket_id}/?$", current.path, re.IGNORECASE):
+            return True
+        confirmation = re.compile(
+            r"(?:заявк[а-я]*|ticket|request)(?:(?!\b(?:не|not|ошибка|error|failed)\b).){0,80}(?:создан[а-я]*|сохран[её]н[а-я]*|created|saved)",
+            re.IGNORECASE,
+        )
+        for context in [page, *page.frames]:
+            try:
+                message = await context.locator("body").first.inner_text(timeout=2000)
+                if confirmation.search(message):
+                    return True
+            except Exception:
+                continue
+        return False
 
     # ==================== Основной процесс ====================
 

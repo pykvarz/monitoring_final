@@ -69,8 +69,14 @@ class StorageManager(IStorageRepository):
             try:
                 with open(self._hosts_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                    if not isinstance(data, list):
+                        logging.warning("Список узлов должен быть JSON-массивом")
+                        return []
                     hosts = []
                     for host_data in data:
+                        if not isinstance(host_data, dict):
+                            logging.warning("Пропуск узла: запись не является JSON-объектом")
+                            continue
                         try:
                             host = Host(**host_data)
                             hosts.append(host)
@@ -126,6 +132,21 @@ class StorageManager(IStorageRepository):
                     if unknown_keys:
                         logging.warning(f"Неизвестные поля в конфигурации (пропущены): {unknown_keys}")
                     filtered_data = {k: v for k, v in data.items() if k in valid_keys}
+                    defaults = AppConfig()
+                    for key, value in list(filtered_data.items()):
+                        default = getattr(defaults, key)
+                        invalid_collection = isinstance(default, (dict, list)) and not isinstance(value, type(default))
+                        if key == "column_widths" and isinstance(value, dict):
+                            invalid_collection = any(
+                                not isinstance(k, str) or type(v) is not int
+                                for k, v in value.items()
+                            )
+                        if isinstance(default, list) and isinstance(value, list):
+                            item_type = str if key in ("custom_groups", "helpdesk_reasons", "helpdesk_reasons_recovered") else int
+                            invalid_collection = any(type(item) is not item_type for item in value)
+                        if invalid_collection:
+                            logging.warning(f"Некорректный тип настройки {key}; используется значение по умолчанию")
+                            filtered_data[key] = default
                     try:
                         return AppConfig(**filtered_data)
                     except (TypeError, ValueError) as e:
