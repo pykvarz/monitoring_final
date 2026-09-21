@@ -207,10 +207,13 @@ class DataManager(QObject):
         return False
 
     def update_host_status(self, host_id: str, status: str, offline_since: Optional[str] = None,
-                           preserve_maintenance: bool = False) -> bool:
+                           preserve_maintenance: bool = False,
+                           update_last_seen: bool = True) -> bool:
         """
         Обновление статуса хоста.
         Если статус реально меняется — пишем событие в журнал истории (status_history).
+        update_last_seen=False при ручных операциях (MAINTENANCE), чтобы не подделывать
+        время последнего ответа без реального ping.
         """
         db = self.db_manager.get_db()
         if not db.isOpen():
@@ -238,9 +241,10 @@ class DataManager(QObject):
         query = QSqlQuery(db)
         
         # Обновляем status, last_seen и offline_since.
-        # last_seen обновляется только когда узел реально ONLINE (offline_since is None),
-        # чтобы не затирать фактическое время последней доступности узла при сбоях.
-        if offline_since is None:
+        # last_seen обновляется только когда update_last_seen=True и offline_since is None
+        # (узел реально ONLINE по результату ping), чтобы не затирать фактическое
+        # время последней доступности при ручных операциях (MAINTENANCE).
+        if status == "ONLINE" and offline_since is None and update_last_seen:
             sql = """
                 UPDATE hosts 
                 SET status = :status, 
@@ -613,5 +617,3 @@ class DataManager(QObject):
             query.finish()
             logging.error(f"Ошибка при удалении группы '{group_name}': {err}")
             return 0
-
-

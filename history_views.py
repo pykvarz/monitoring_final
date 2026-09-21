@@ -399,7 +399,7 @@ class EventLogPanel(QFrame):
                 self._list.setItemWidget(list_item, item_widget)
 
         count = len(events)
-        suffix = " (последние 200)" if count >= 200 else ""
+        suffix = " (последние 30)" if count >= 30 else ""
         self._summary_label.setText(f"Событий: {count}{suffix}")
 
     def set_theme(self, theme: str):

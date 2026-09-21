@@ -475,17 +475,51 @@ class HelpdeskService:
             return False
         if before.netloc and current.netloc and before.netloc.lower() != current.netloc.lower():
             return False
+
+        # URL-подтверждение: /ticket/ID считается успехом ТОЛЬКО если URL изменился
+        # относительно page_url_before_save (т.е. это новая карточка, а не та же старая)
         ticket_id = r"(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
         if re.search(rf"/(?:ticket|servicecall|request)/{ticket_id}/?$", current.path, re.IGNORECASE):
-            return True
+            if current_url != page_url_before_save:
+                return True
+
+        # Текстовое подтверждение: сначала ищем в контейнерах уведомлений,
+        # а не во всём body (предотвращает ложное срабатывание на старых записях)
         confirmation = re.compile(
-            r"(?:заявк[а-я]*|ticket|request)(?:(?!\b(?:не|not|ошибка|error|failed)\b).){0,80}(?:создан[а-я]*|сохран[её]н[а-я]*|created|saved)",
+            r"(?:заявк[а-я]*|обращен[а-я]*|инцидент[а-я]*|тикет[а-я]*|ticket|request|issue)(?:(?!\b(?:не|not|ошибка|error|failed)\b).){0,80}(?:создан[а-я]*|сохран[её]н[а-я]*|зарегистрирован[а-я]*|created|saved|registered)",
             re.IGNORECASE,
+        )
+        # ID заявки в тексте (для fallback проверки body — требуется конкретный идентификатор)
+        ticket_id_in_text = re.compile(
+            r"(?:№\s*|#\s*|ID\s*[:=]?\s*)\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            re.IGNORECASE,
+        )
+        notification_selector = (
+            ".notification, .alert, .toast, [role='alert'], "
+            ".gwt-Notification, .b-notification, .messages, "
+            ".success-message, .status-message"
         )
         for context in [page, *page.frames]:
             try:
+                # Сначала: контейнеры уведомлений
+                notification_els = context.locator(notification_selector)
+                count = await notification_els.count()
+                for i in range(count):
+                    try:
+                        text = await notification_els.nth(i).inner_text(timeout=1000)
+                        if confirmation.search(text):
+                            return True
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
+        # Fallback: body, но с дополнительным условием — текст должен содержать
+        # идентификатор заявки (номер/UUID), что делает его уникальным для текущей операции
+        for context in [page, *page.frames]:
+            try:
                 message = await context.locator("body").first.inner_text(timeout=2000)
-                if confirmation.search(message):
+                if confirmation.search(message) and ticket_id_in_text.search(message):
                     return True
             except Exception:
                 continue

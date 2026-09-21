@@ -93,11 +93,13 @@ class ExcelService:
         """
         Предотвращает Formula Injection (CWE-1236) при экспорте в Excel.
         Если строковое значение (включая строки с начальными пробелами)
-        начинается с '=', '+', '-', '@', '\t', '\r', экранирует его ведущим апострофом.
+        начинается с '=', '+', '-', '@', '\\t', '\\r', экранирует его ведущим апострофом.
         """
         if isinstance(val, str) and val:
+            if val[0] in ('\t', '\r') or val.startswith(('=', '+', '-', '@')):
+                return "'" + val
             stripped = val.lstrip()
-            if stripped and stripped[0] in ('=', '+', '-', '@', '\t', '\r'):
+            if stripped and stripped[0] in ('=', '+', '-', '@'):
                 return "'" + val
         return val
 
@@ -156,10 +158,10 @@ class ExcelService:
                     ExcelService.sanitize_cell_value(host.ip),
                     ExcelService.sanitize_cell_value(host.address),
                     ExcelService.sanitize_cell_value(host.group),
-                    status_name,
-                    last_seen,
-                    offline_since,
-                    notifications
+                    ExcelService.sanitize_cell_value(status_name),
+                    ExcelService.sanitize_cell_value(last_seen),
+                    ExcelService.sanitize_cell_value(offline_since),
+                    ExcelService.sanitize_cell_value(notifications),
                 ]
                 sheet.append(row_data)
 
@@ -184,4 +186,3 @@ class ExcelService:
 
         except Exception as e:
             raise e
-

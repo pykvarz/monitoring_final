@@ -137,7 +137,8 @@ class HostManager:
         for host in hosts:
             new_status = "ONLINE" if host.status == "MAINTENANCE" else "MAINTENANCE"
             # offline_since сбрасываем если уходим в MAINTENANCE или выходим в ONLINE
-            repository.update_status(host.id, new_status, None)
+            # update_last_seen=False — не подделывать время ответа без реального ping
+            repository.update_status(host.id, new_status, None, update_last_seen=False)
 
     @staticmethod
     def toggle_maintenance(parent, row: int, table_model, repository: HostRepository) -> None:
@@ -154,7 +155,8 @@ class HostManager:
             return
             
         new_status = "ONLINE" if host.status == "MAINTENANCE" else "MAINTENANCE"
-        repository.update_status(host.id, new_status, None)
+        # update_last_seen=False — не подделывать время ответа без реального ping
+        repository.update_status(host.id, new_status, None, update_last_seen=False)
 
     @staticmethod
     def change_group_selected(parent, table_model, groups: List[str], repository: HostRepository) -> None:

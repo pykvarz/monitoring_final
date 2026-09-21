@@ -36,7 +36,7 @@ class ExportImportManager:
             self._parent, 
             "Выберите Excel файл для импорта", 
             "",
-            "Excel Files (*.xlsx *.xls);;All Files (*)"
+            "Excel Files (*.xlsx);;All Files (*)"
         )
 
         if not file_path:

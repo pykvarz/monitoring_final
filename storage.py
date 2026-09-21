@@ -147,6 +147,21 @@ class StorageManager(IStorageRepository):
                         if invalid_collection:
                             logging.warning(f"Некорректный тип настройки {key}; используется значение по умолчанию")
                             filtered_data[key] = default
+                            continue
+                        # Валидация скалярных типов (FIX дефект #5 аудита)
+                        # bool проверяется первым, т.к. isinstance(True, int) == True
+                        if type(default) is bool:
+                            if type(value) is not bool:
+                                logging.warning(f"Некорректный тип настройки {key} (ожидался bool); используется значение по умолчанию")
+                                filtered_data[key] = default
+                        elif type(default) is int:
+                            if type(value) is not int:
+                                logging.warning(f"Некорректный тип настройки {key} (ожидался int); используется значение по умолчанию")
+                                filtered_data[key] = default
+                        elif isinstance(default, str):
+                            if not isinstance(value, str):
+                                logging.warning(f"Некорректный тип настройки {key} (ожидался str); используется значение по умолчанию")
+                                filtered_data[key] = default
                     try:
                         return AppConfig(**filtered_data)
                     except (TypeError, ValueError) as e:

@@ -472,3 +472,115 @@ def test_monitor_interrupt_cycle_cancels_pending_futures():
         monitor.stop()
 
     assert not h2_started.is_set(), "h2 должен был быть отменён в очереди пула при прерывании цикла"
+
+
+def test_data_manager_maintenance_preserves_last_seen_even_without_flag(tmp_path):
+    """Смена статуса на MAINTENANCE не обновляет last_seen, даже если флаг update_last_seen не задан."""
+    db_manager = DatabaseManager(str(tmp_path / "last_seen_maint.db"))
+    dm = DataManager(db_manager)
+    repo = HostRepository(dm)
+    h = Host(id="h-last-seen", name="ATM-LastSeen", ip="127.0.0.1", status="ONLINE")
+    repo.add(h)
+
+    old_ts = "2026-09-01T10:00:00+00:00"
+    q = QSqlQuery(db_manager.get_db())
+    q.prepare("UPDATE hosts SET last_seen = :ls WHERE id = :id")
+    q.bindValue(":ls", old_ts)
+    q.bindValue(":id", h.id)
+    assert q.exec_()
+    q.finish()
+
+    # Прямой вызов update_status без передачи update_last_seen
+    dm.update_host_status(h.id, "MAINTENANCE")
+    updated = repo.get(h.id)
+    assert updated.status == "MAINTENANCE"
+    assert updated.last_seen == old_ts, f"last_seen был подделан! {updated.last_seen} != {old_ts}"
+    db_manager.close()
+
+
+def test_helpdesk_confirm_saved_matches_russian_incident_and_request():
+    """Проверка подтверждения Helpdesk для терминов «обращение» и «инцидент» с ID."""
+    async def run():
+        page = MagicMock()
+        page.url = "https://helpdesk.example/sd/operator/"
+        page.frames = []
+
+        # Контейнер уведомлений с сообщением «Обращение №12345 зарегистрировано»
+        notify_el = MagicMock()
+        notify_el.inner_text = AsyncMock(return_value="Обращение №12345 успешно зарегистрировано")
+        locator_mock = MagicMock()
+        locator_mock.count = AsyncMock(return_value=1)
+        locator_mock.nth.return_value = notify_el
+
+        page.locator.return_value = locator_mock
+
+        with patch.object(HelpdeskService, "_wait_for_form_closed", new=AsyncMock(return_value=True)):
+            res = await HelpdeskService._confirm_ticket_saved(
+                page,
+                MagicMock(),
+                "https://helpdesk.example/sd/createTicket.html",
+            )
+            assert res is True
+
+            # Проверка, что неизменившийся URL карточки не подтверждает сохранение
+            page_same_url = MagicMock()
+            page_same_url.url = "https://helpdesk.example/sd/ticket/12345"
+            page_same_url.frames = []
+            empty_locator = MagicMock()
+            empty_locator.count = AsyncMock(return_value=0)
+            page_same_url.locator.return_value = empty_locator
+            res_same = await HelpdeskService._confirm_ticket_saved(
+                page_same_url,
+                MagicMock(),
+                "https://helpdesk.example/sd/ticket/12345",
+            )
+            assert res_same is False
+
+    asyncio.run(run())
+
+
+def test_excel_sanitize_cell_value_tabs_and_formulas():
+    """Проверка экранирования формул и спецсимволов при экспорте в Excel."""
+    assert ExcelService.sanitize_cell_value("\tcalc") == "'\tcalc"
+    assert ExcelService.sanitize_cell_value("\rtest") == "'\rtest"
+    assert ExcelService.sanitize_cell_value("=1+1") == "'=1+1"
+    assert ExcelService.sanitize_cell_value("+cmd") == "'+cmd"
+    assert ExcelService.sanitize_cell_value("-123") == "'-123"
+    assert ExcelService.sanitize_cell_value("@SUM(A1)") == "'@SUM(A1)"
+    assert ExcelService.sanitize_cell_value("   =SUM(B2)") == "'   =SUM(B2)"
+    assert ExcelService.sanitize_cell_value("Normal host") == "Normal host"
+
+
+def test_storage_scalar_types_validation(tmp_path):
+    """Проверка валидации скалярных типов конфигурации config.json."""
+    storage = StorageManager(base_dir=str(tmp_path))
+    cfg_file = tmp_path / "config.json"
+    cfg_file.write_text(
+        json.dumps({
+            "poll_interval": 12.5,
+            "helpdesk_url": 42,
+            "notifications_enabled": "false",
+            "history_retention_days": "infinite"
+        }),
+        encoding="utf-8"
+    )
+    loaded = storage.load_config()
+    assert type(loaded.poll_interval) is int and loaded.poll_interval == 10
+    assert type(loaded.helpdesk_url) is str and loaded.helpdesk_url == ""
+    assert type(loaded.notifications_enabled) is bool and loaded.notifications_enabled is True
+    assert type(loaded.history_retention_days) is int and loaded.history_retention_days == 90
+
+
+def test_export_import_manager_filter_removes_xls():
+    """Диалог импорта не должен предлагать устаревший формат .xls."""
+    from export_import_manager import ExportImportManager
+    from unittest.mock import patch
+
+    with patch("export_import_manager.QFileDialog.getOpenFileName") as mock_dialog:
+        mock_dialog.return_value = ("", "")
+        mgr = ExportImportManager(None, MagicMock())
+        mgr.import_from_excel()
+        assert mock_dialog.called
+        filter_arg = mock_dialog.call_args[0][3]
+        assert "*.xls " not in filter_arg and not filter_arg.endswith("*.xls)")
+        assert "*.xlsx" in filter_arg

@@ -86,8 +86,12 @@ class HostRepository(QObject):
         
     def update_status(self, host_id: str, new_status: str, 
                      offline_since: Optional[str] = None, 
-                     offline_time: Optional[str] = None) -> bool:
-        return self._data_manager.update_host_status(host_id, new_status, offline_since)
+                     offline_time: Optional[str] = None,
+                     update_last_seen: bool = True) -> bool:
+        return self._data_manager.update_host_status(
+            host_id, new_status, offline_since,
+            update_last_seen=update_last_seen,
+        )
 
     def apply_monitor_status(self, host_id: str, new_status: str,
                              offline_since: Optional[str] = None) -> bool:

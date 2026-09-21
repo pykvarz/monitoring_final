@@ -55,30 +55,36 @@ class MonitorThread(QThread):
         self._recovery_times: Dict[str, datetime] = {}
         self._offline_since_cache: Dict[str, str] = {}
         self._executor_lock = threading.Lock()
+        self._pending_max_workers: Optional[int] = None  # Отложенная смена размера пула
         self._update_executor()
 
     def _update_executor(self) -> None:
-        """Обновление пула потоков с защитой блокировкой"""
+        """Создание/пересоздание пула потоков на границе цикла (безопасная замена)"""
         with self._executor_lock:
             old_executor = self._executor
-            self._executor = ThreadPoolExecutor(max_workers=self._config.max_workers)
+            workers = self._pending_max_workers if self._pending_max_workers is not None else self._config.max_workers
+            self._executor = ThreadPoolExecutor(max_workers=workers)
+            self._pending_max_workers = None
 
         if old_executor:
             try:
-                import sys
-                if sys.version_info >= (3, 9):
-                    old_executor.shutdown(wait=False, cancel_futures=True)
-                else:
-                    old_executor.shutdown(wait=False)
-            except (RuntimeError, TypeError):
+                old_executor.shutdown(wait=False)
+            except (RuntimeError, Exception):
                 pass
 
     def update_config(self, config: AppConfig) -> None:
-        """Обновление конфигурации"""
+        """
+        Обновление конфигурации.
+        Если поток не запущен — обновляем пул немедленно.
+        Если поток запущен — откладываем до границы цикла для предотвращения зависания as_completed.
+        """
         current_workers = self._executor._max_workers if self._executor else 0
         self._config = config
         if config.max_workers != current_workers:
-            self._update_executor()
+            if not self.isRunning():
+                self._update_executor()
+            else:
+                self._pending_max_workers = config.max_workers
 
     def force_scan(self) -> None:
         """Принудительное сканирование"""
@@ -129,7 +135,7 @@ class MonitorThread(QThread):
                     self._executor.shutdown(wait=False, cancel_futures=True)
                 except (RuntimeError, TypeError):
                     pass
-        self.wait()
+        self.wait(10000)  # Таймаут 10с — не блокировать закрытие приложения навсегда
 
     def _check_host(self, host: Host) -> Tuple[str, str, Optional[str]]:
         """Проверка одного узла"""
@@ -161,6 +167,12 @@ class MonitorThread(QThread):
 
             while self._running:
                 try:
+                    # Отложенная смена пула потоков — безопасно на границе цикла,
+                    # когда нет активных futures от предыдущей итерации.
+                    if self._pending_max_workers is not None:
+                        logging.info(f"MonitorThread: Применяем отложенную смену пула: {self._pending_max_workers} workers")
+                        self._update_executor()
+
                     if self._paused:
                         self.msleep(150)
                         continue
@@ -207,7 +219,16 @@ class MonitorThread(QThread):
                             current_db_host = self._repository.get(host_id, connection_name=connection_name)
                             if current_db_host and current_db_host.status == "MAINTENANCE":
                                 self._known_statuses[host_id] = "MAINTENANCE"
+                                # Сброс кешей простоя при обнаружении MAINTENANCE (FIX дефект #3)
+                                self._offline_since_cache.pop(host_id, None)
+                                self._recovery_times.pop(host_id, None)
                                 continue
+
+                            # Ручной выход из MAINTENANCE: кеши простоя устарели (FIX дефект #3)
+                            prev_known = self._known_statuses.get(host_id)
+                            if prev_known == "MAINTENANCE" and current_db_host and current_db_host.status != "MAINTENANCE":
+                                self._offline_since_cache.pop(host_id, None)
+                                self._recovery_times.pop(host_id, None)
 
                             # Логика смены статуса (Domain Logic)
                             new_status, offline_since, should_update = self._calculate_status(host, ping_status, current_time)
