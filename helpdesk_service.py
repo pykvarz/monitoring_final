@@ -303,23 +303,29 @@ class HelpdeskService:
 
             await trigger.scroll_into_view_if_needed()
             await trigger.click(timeout=3000)
-            await page.wait_for_timeout(400)
 
             opt = None
-            for target_text in [text_to_select, text_to_select.strip()]:
-                for search_ctx in [form_ctx, page]:
-                    candidate = search_ctx.get_by_text(target_text, exact=True).last
-                    try:
-                        if await candidate.count() > 0 and await candidate.is_visible():
-                            opt = candidate
-                            break
-                    except Exception:
-                        pass
+            for attempt in range(10):
+                await page.wait_for_timeout(150)
+                
+                # Поиск точного совпадения
+                for target_text in [text_to_select, text_to_select.strip()]:
+                    for search_ctx in [form_ctx, page]:
+                        candidate = search_ctx.get_by_text(target_text, exact=True).last
+                        try:
+                            if await candidate.count() > 0 and await candidate.is_visible():
+                                opt = candidate
+                                break
+                        except Exception:
+                            pass
+                    if opt:
+                        break
+                
                 if opt:
                     break
 
-            if not opt:
-                pattern = re.compile(rf"^\s*{re.escape(text_to_select)}\s*$", re.IGNORECASE)
+                # Поиск по регулярному выражению (начинается с искомого текста, без учета регистра)
+                pattern = re.compile(rf"^\s*{re.escape(text_to_select)}", re.IGNORECASE)
                 for search_ctx in [form_ctx, page]:
                     candidate = search_ctx.get_by_text(pattern).first
                     try:
@@ -328,6 +334,9 @@ class HelpdeskService:
                             break
                     except Exception:
                         pass
+                
+                if opt:
+                    break
 
             if opt:
                 await opt.scroll_into_view_if_needed()
@@ -407,7 +416,10 @@ class HelpdeskService:
                         if await target.is_visible():
                             await target.scroll_into_view_if_needed()
                             await target.click()
-                            await target.fill(description)
+                            await target.press("Control+A")
+                            await target.press("Backspace")
+                            await target.evaluate("el => { if(el.isContentEditable) el.innerHTML = ''; }")
+                            await target.press_sequentially(description, delay=2)
                             return True
 
             escaped = cls._xpath_escape("Описание")
@@ -423,14 +435,21 @@ class HelpdeskService:
                     if await area.count() > 0 and await area.is_visible():
                         await area.scroll_into_view_if_needed()
                         await area.click()
-                        await area.fill(description)
+                        await area.press("Control+A")
+                        await area.press("Backspace")
+                        await area.evaluate("el => { if(el.isContentEditable) el.innerHTML = ''; }")
+                        await area.press_sequentially(description, delay=2)
                         return True
 
             for f in page.frames:
                 try:
                     body = f.locator("body[contenteditable='true'], body.cke_editable, body").first
                     if await body.count() > 0 and await body.get_attribute("contenteditable") == "true":
-                        await body.fill(description)
+                        await body.click()
+                        await body.press("Control+A")
+                        await body.press("Backspace")
+                        await body.evaluate("el => { el.innerHTML = ''; }")
+                        await body.press_sequentially(description, delay=2)
                         return True
                 except Exception:
                     continue
@@ -447,7 +466,11 @@ class HelpdeskService:
             ).first
             await marker.wait_for(state="hidden", timeout=5000)
             return True
-        except Exception:
+        except Exception as e:
+            err_msg = str(e)
+            if "Execution context was destroyed" in err_msg or "Target page, context or browser has been closed" in err_msg:
+                return True
+                
             is_detached = getattr(form_ctx, "is_detached", None)
             if callable(is_detached):
                 try:
@@ -686,8 +709,10 @@ class HelpdeskService:
 
                 agreement_ok = await cls._select_dropdown(page, form_ctx, "gwt-debug-agreementServiceProperty-value", "Соглашение/Услуга", "Устройство самообслуживания")
                 await page.wait_for_timeout(800)
-                category_ok = await cls._select_dropdown(page, form_ctx, "gwt-debug-servCategory-value", "Категория услуги", "ATM")
-                await page.wait_for_timeout(800)
+
+                category_ok = await cls._select_dropdown(page, form_ctx, "gwt-debug-servCategory-value", "Категория услуги", "АТМ")
+                await page.wait_for_timeout(1500)
+
                 subcategory_ok = await cls._select_dropdown(page, form_ctx, "gwt-debug-subCategory-value", "Подкатегория", "Статус 13")
                 await page.wait_for_timeout(800)
 

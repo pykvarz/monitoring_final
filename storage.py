@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import List, Optional, Union
 from contextlib import contextmanager
@@ -20,10 +21,8 @@ from models import Host, AppConfig
 from interfaces import IStorageRepository
 from database import DatabaseManager  # NEW
 
-
 class StorageManager(IStorageRepository):
     """Потокобезопасное хранилище данных (JSON реализация)"""
-
     def __init__(self, base_dir: Optional[Union[str, Path]] = None):
         self._mutex = QMutex()
         if base_dir is not None:
@@ -198,7 +197,18 @@ class StorageManager(IStorageRepository):
                 json.dump(data, stream, indent=2, ensure_ascii=ensure_ascii)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temp_path, path)
+            
+            # Механизм повторных попыток для обхода кратковременных блокировок
+            # файла в Windows (например, от антивируса или file watcher)
+            for attempt in range(5):
+                try:
+                    os.replace(temp_path, path)
+                    break
+                except PermissionError:
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.05)  # Ждем 50 мс перед повторной попыткой
+
         except Exception:
             if temp_path is not None:
                 try:

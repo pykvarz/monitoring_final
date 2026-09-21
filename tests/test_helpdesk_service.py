@@ -232,7 +232,7 @@ class TestHelpdeskFormMethodsMock(unittest.IsolatedAsyncioTestCase):
         page, loc = self._make_page(locator_count=1, visible=True)
         result = await HelpdeskService._fill_description(page, page, "Тестовое описание")
         self.assertTrue(result)
-        loc.fill.assert_called_with("Тестовое описание")
+        loc.press_sequentially.assert_called_with("Тестовое описание", delay=2)
 
 
 if __name__ == '__main__':
