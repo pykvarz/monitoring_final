@@ -132,7 +132,7 @@ class MainWindow(QMainWindow):
             NotificationService.show_notification("Helpdesk", msg)
 
     def _on_helpdesk_ticket_failed(self, host: str, action: str, error_msg: str) -> None:
-        msg = f"Не удалось создать заявку ({action}) для {host}:\n{error_msg}"
+        msg = f"Helpdesk ({action}) для {host}:\n{error_msg}"
         if hasattr(self, '_toast_manager') and self._toast_manager:
             self._toast_manager.show_info("Ошибка Helpdesk", msg)
         else:

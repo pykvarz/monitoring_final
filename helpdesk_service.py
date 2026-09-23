@@ -486,9 +486,8 @@ class HelpdeskService:
 
     @classmethod
     async def _confirm_ticket_saved(cls, page, form_ctx, page_url_before_save: str) -> bool:
-        """Подтвердить закрытие формы без ухода со страницы Helpdesk на авторизацию."""
-        if not await cls._wait_for_form_closed(form_ctx):
-            return False
+        """Подтвердить новую карточку либо сообщение после закрытия формы."""
+        form_closed = await cls._wait_for_form_closed(form_ctx)
 
         current_url = str(getattr(page, "url", "") or "")
         before = urllib.parse.urlparse(page_url_before_save or "")
@@ -496,15 +495,24 @@ class HelpdeskService:
         auth_target = " ".join((current.path, current.query, current.fragment)).lower()
         if re.search(r"(^|[/_.?=&\s-])(login|signin|sign-in|auth|sso)([/_.?=&\s-]|$)", auth_target):
             return False
-        if before.netloc and current.netloc and before.netloc.lower() != current.netloc.lower():
+        if (before.scheme, before.netloc.lower()) != (current.scheme, current.netloc.lower()):
             return False
 
-        # URL-подтверждение: /ticket/ID считается успехом ТОЛЬКО если URL изменился
-        # относительно page_url_before_save (т.е. это новая карточка, а не та же старая)
+        # В сохранённой карточке поля формы могут остаться видимыми.
+        # Смена только query не означает переход к новой заявке.
         ticket_id = r"(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
         if re.search(rf"/(?:ticket|servicecall|request)/{ticket_id}/?$", current.path, re.IGNORECASE):
-            if current_url != page_url_before_save:
+            if current.path.rstrip("/") != before.path.rstrip("/"):
                 return True
+
+        # Naumen использует hash-маршрут #uuid:serviceCall$<числовой ID>.
+        if (current.path == before.path
+                and re.fullmatch(r"uuid:serviceCall\$[0-9]+", current.fragment, re.IGNORECASE)
+                and current.fragment.lower() != before.fragment.lower()):
+            return True
+
+        if not form_closed:
+            return False
 
         # Текстовое подтверждение: сначала ищем в контейнерах уведомлений,
         # а не во всём body (предотвращает ложное срабатывание на старых записях)
@@ -771,7 +779,10 @@ class HelpdeskService:
                 target_ctx = form_ctx if form_ctx else page
                 if not await cls._confirm_ticket_saved(page, target_ctx, page_url_before_save):
                     await cls._capture_error_screenshot(page, host_name)
-                    err_msg = f"Форма заявки не закрылась после сохранения для {host_name} (возможно, ошибка валидации на сервере)"
+                    err_msg = (
+                        f"Не удалось подтвердить сохранение заявки для {host_name}. "
+                        "Проверьте её наличие в Helpdesk перед повторной отправкой."
+                    )
                     logging.error(err_msg)
                     emit_failed(err_msg)
                     return
