@@ -242,7 +242,7 @@ class MonitorThread(QThread):
                                 # Notification Logic — используем кеш статусов потока
                                 if new_status == "OFFLINE" and prev_status != "OFFLINE" and host.notifications_enabled:
                                     newly_offline.append(host.name)
-                                elif new_status == "ONLINE" and prev_status in ("OFFLINE", "WAITING") and host.notifications_enabled:
+                                elif new_status == "ONLINE" and prev_status == "OFFLINE" and host.notifications_enabled:
                                     newly_recovered.append(host.name)
                                 
                                 # Обновляем кеш статусов
