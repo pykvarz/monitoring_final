@@ -302,7 +302,7 @@ class HelpdeskService:
                 return False
 
             await trigger.scroll_into_view_if_needed()
-            await trigger.click(timeout=3000)
+            await trigger.click(timeout=3000, force=True)
 
             opt = None
             for attempt in range(10):
@@ -340,13 +340,13 @@ class HelpdeskService:
 
             if opt:
                 await opt.scroll_into_view_if_needed()
-                await opt.click(timeout=3000)
+                await opt.click(timeout=3000, force=True)
                 await page.wait_for_timeout(400)
                 return True
 
             inp = trigger.locator("input.formSelect, input").first
             if await inp.count() > 0 and await inp.is_visible():
-                await inp.click()
+                await inp.click(force=True)
                 await inp.fill("")
                 await inp.press_sequentially(text_to_select, delay=40)
                 await page.wait_for_timeout(400)
@@ -372,7 +372,7 @@ class HelpdeskService:
                 if await target_input.count() == 0:
                     target_input = container
                 await target_input.scroll_into_view_if_needed()
-                await target_input.click(timeout=3000)
+                await target_input.click(timeout=3000, force=True)
                 await target_input.fill(value)
                 await target_input.press("Tab")
                 return True
@@ -395,7 +395,7 @@ class HelpdeskService:
                 for cand in candidates:
                     if await cand.count() > 0 and await cand.first.is_visible():
                         await cand.first.scroll_into_view_if_needed()
-                        await cand.first.click()
+                        await cand.first.click(force=True)
                         await cand.first.fill(value)
                         return True
         except Exception as ex:
@@ -415,7 +415,7 @@ class HelpdeskService:
                             target = c
                         if await target.is_visible():
                             await target.scroll_into_view_if_needed()
-                            await target.click()
+                            await target.click(force=True)
                             await target.press("Control+A")
                             await target.press("Backspace")
                             await target.evaluate("el => { if(el.isContentEditable) el.innerHTML = ''; }")
@@ -434,7 +434,7 @@ class HelpdeskService:
                     area = row.locator("textarea, [contenteditable='true']").first
                     if await area.count() > 0 and await area.is_visible():
                         await area.scroll_into_view_if_needed()
-                        await area.click()
+                        await area.click(force=True)
                         await area.press("Control+A")
                         await area.press("Backspace")
                         await area.evaluate("el => { if(el.isContentEditable) el.innerHTML = ''; }")
@@ -445,7 +445,7 @@ class HelpdeskService:
                 try:
                     body = f.locator("body[contenteditable='true'], body.cke_editable, body").first
                     if await body.count() > 0 and await body.get_attribute("contenteditable") == "true":
-                        await body.click()
+                        await body.click(force=True)
                         await body.press("Control+A")
                         await body.press("Backspace")
                         await body.evaluate("el => { el.innerHTML = ''; }")
@@ -770,7 +770,7 @@ class HelpdeskService:
                     return
 
                 page_url_before_save = page.url
-                await save_btn.click(timeout=5000)
+                await save_btn.click(timeout=5000, force=True)
                 try:
                     await page.wait_for_load_state('networkidle', timeout=10000)
                 except Exception:
