@@ -250,8 +250,8 @@ class HelpdeskService:
 
     @staticmethod
     async def _find_form_context(page):
-        """Поиск контекста формы (в основном окне или во встроенных iframes), до 25 секунд."""
-        for _ in range(50):
+        """Поиск контекста формы (в основном окне или во встроенных iframes), до 60 секунд."""
+        for _ in range(120):
             contexts = [page] + list(page.frames)
             for search_ctx in contexts:
                 try:
@@ -707,9 +707,21 @@ class HelpdeskService:
             page = await context.new_page()
 
             try:
-                await page.goto(url, timeout=20000)
+                await page.goto(url, timeout=30000)
                 try:
-                    await page.wait_for_load_state('networkidle', timeout=10000)
+                    await page.wait_for_load_state('networkidle', timeout=15000)
+                except Exception:
+                    pass
+
+                # Ожидание завершения загрузки GWT (экран "Идёт загрузка")
+                try:
+                    loading = page.locator(
+                        "text=/загрузк|loading|подождите/i"
+                    ).first
+                    if await loading.count() > 0:
+                        logging.info("Helpdesk: обнаружен экран загрузки GWT, ожидаем...")
+                        await loading.wait_for(state="hidden", timeout=45000)
+                        logging.info("Helpdesk: экран загрузки GWT исчез")
                 except Exception:
                     pass
 
